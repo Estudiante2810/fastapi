@@ -139,13 +139,21 @@ def build_calc_panel(
     cmyk_marks: dict,
     k_marks: list,
     filename: str = '',
+    calibration_method: str = 'camera_distance',
+    mark_size_mm: float = None,
+    mm_per_px: float = None,
 ) -> np.ndarray:
     """
     Genera el panel de cálculos: desalineamientos respecto a K y distancias en mm.
     """
-    image_width_px  = img_bgr.shape[1]
-    tamano_pixel_mm = sensor_width_mm / image_width_px
-    mm_por_px = (tamano_pixel_mm * distancia_camara_plano_mm) / focal_mm
+    image_width_px = img_bgr.shape[1]
+    
+    # Si no se pasó mm_per_px, calcular con el método por defecto
+    if mm_per_px is None:
+        tamano_pixel_mm = sensor_width_mm / image_width_px
+        mm_por_px = (tamano_pixel_mm * distancia_camara_plano_mm) / focal_mm
+    else:
+        mm_por_px = mm_per_px
 
     positions = {
         ch: (cmyk_marks[ch][0][0], cmyk_marks[ch][0][1])
@@ -153,12 +161,17 @@ def build_calc_panel(
         if cmyk_marks.get(ch)
     }
 
+    # Texto diferente según el método de calibración
+    if calibration_method == 'mark_size' and mark_size_mm:
+        calibration_text = f'Calibrado con marca de {mark_size_mm} mm'
+    else:
+        calibration_text = (
+            f'Dist. camara-plano: {distancia_camara_plano_mm} mm  |  Focal: {focal_mm} mm'
+        )
+
     lines = [
         f'Archivo: {filename}',
-        (
-            f'Factor optico: 1 px = {mm_por_px:.4f} mm  |  '
-            f'Dist. camara-plano: {distancia_camara_plano_mm} mm  |  Focal: {focal_mm} mm'
-        ),
+        f'Factor optico: 1 px = {mm_por_px:.4f} mm  |  {calibration_text}',
         '',
         '--- Desalineamiento respecto a K ---',
     ]
@@ -170,9 +183,9 @@ def build_calc_panel(
                 dx_px = positions[ch][0] - kx
                 dy_px = positions[ch][1] - ky
                 dp    = np.hypot(dx_px, dy_px)
-                dx_mm = (dx_px * tamano_pixel_mm * distancia_camara_plano_mm) / focal_mm
-                dy_mm = (dy_px * tamano_pixel_mm * distancia_camara_plano_mm) / focal_mm
-                dm    = (dp    * tamano_pixel_mm * distancia_camara_plano_mm) / focal_mm
+                dx_mm = dx_px * mm_por_px
+                dy_mm = dy_px * mm_por_px
+                dm    = dp * mm_por_px
                 lines.append(
                     f'  {ch}-K:  Dx={dx_mm:+.3f} mm   Dy={dy_mm:+.3f} mm   dist={dm:.3f} mm  ({dp:.1f} px)'
                 )
@@ -187,7 +200,7 @@ def build_calc_panel(
             dx = positions[n1][0] - positions[n2][0]
             dy = positions[n1][1] - positions[n2][1]
             dp = np.hypot(dx, dy)
-            dm = (dp * tamano_pixel_mm * distancia_camara_plano_mm) / focal_mm
+            dm = dp * mm_por_px
             lines.append(f'  {n1}-{n2}:  {dm:.3f} mm  ({dp:.1f} px)')
 
     font = cv2.FONT_HERSHEY_SIMPLEX
@@ -219,6 +232,9 @@ def save_all_outputs(
     name_no_ext: str,
     filename: str = '',
     roi_margin: int = 230,
+    mm_per_px: float = None,
+    calibration_method: str = 'camera_distance',
+    mark_size_mm: float = None,
 ) -> dict[str, str]:
     """
     Guarda los 3 archivos JPG de salida y retorna un dict con las rutas.
@@ -227,7 +243,12 @@ def save_all_outputs(
 
     masks_img  = build_masks_panel(img_bgr, cmyk_marks, diag_por_canal, k_marks, roi_margin)
     result_img = build_result_image(img_bgr, cmyk_marks, k_marks, filename, roi_margin)
-    calc_img   = build_calc_panel(img_bgr, cmyk_marks, k_marks, filename)
+    calc_img   = build_calc_panel(
+        img_bgr, cmyk_marks, k_marks, filename,
+        calibration_method=calibration_method,
+        mark_size_mm=mark_size_mm,
+        mm_per_px=mm_per_px,
+    )
 
     paths = {
         'mascaras':    os.path.join(output_dir, f'{name_no_ext}_mascaras.jpg'),

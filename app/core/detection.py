@@ -268,17 +268,23 @@ def procesar_imagen_completa(
     roi_margin: int = 230,
     search_radius: int = 110,
     min_pixels: int = 1000,
+    channels: list = None,  # Agregar este parámetro
 ) -> tuple[dict | None, dict | None, list]:
     """
     Procesa una imagen completa: detecta K, luego C/M/Y.
-
-    Retorna: (cmyk_marks, diag_por_canal, k_marks)
+    
+    Args:
+        channels: Lista de canales a analizar (ej: ['C', 'M', 'Y']).
+                 Si None, analiza todos.
     """
     from app.core.image_utils import (
         preprocess_image,
         multi_scale_template_match,
         non_max_suppression,
     )
+
+    if channels is None:
+        channels = ['C', 'M', 'Y']
 
     # PASO 1: Detectar K
     lab_prep = preprocess_image(img_bgr)
@@ -293,11 +299,15 @@ def procesar_imagen_completa(
     if not k_marks:
         return None, None, []
 
-    # PASO 2: Detectar CMY
+    # PASO 2: Detectar solo los canales seleccionados
     cmyk_marks     = {'K': k_marks}
     diag_por_canal = {}
 
     for ch_name, ch_info in CMY_CROP_RANGES.items():
+        if ch_name not in channels:  # Solo si está en la lista
+            cmyk_marks[ch_name] = []
+            continue
+            
         marks_canal, diag_data = detectar_canal(
             img_bgr, ch_name, ch_info, k_marks,
             template, roi_margin=roi_margin,

@@ -12,7 +12,7 @@ import numpy as np
 from fastapi import APIRouter, File, UploadFile, HTTPException, Query
 from fastapi.responses import FileResponse
 
-from app.core.config import APPLY_SHARPENING, SHARPENING_STRENGTH
+from app.core.config import APPLY_SHARPENING, SHARPENING_STRENGTH, calculate_mm_per_pixel
 from app.core.image_utils import (
     create_crosshair_template,
     sharpen_image,
@@ -20,6 +20,7 @@ from app.core.image_utils import (
 from app.core.detection import procesar_imagen_completa
 from app.core.output_builder import save_all_outputs
 from app.schemas.detection import DetectionResult, ChannelResult, MarkPosition
+from app.schemas.calibration import CalibrationMethod, CMYKChannel
 
 router = APIRouter(prefix="/detection", tags=["detection"])
 
@@ -66,6 +67,15 @@ async def analyze_image(
     save_outputs: bool = Query(True, description="Si True, guarda los 3 JPG de salida"),
     roi_margin: int = Query(230, description="Margen ROI alrededor de la marca K (px)"),
     min_pixels: int = Query(1000, description="Mínimo de píxeles para considerar canal detectado"),
+    calibration_method: CalibrationMethod = Query(
+        CalibrationMethod.CAMERA_DISTANCE,
+        description="Método para calcular mm/pixel"
+    ),
+    mark_size_mm: float = Query(None, description="Tamaño conocido del registro en mm (si usa MARK_SIZE)"),
+    channels: list[CMYKChannel] = Query(
+        [CMYKChannel.C, CMYKChannel.M, CMYKChannel.Y],
+        description="Canales C, M, Y a analizar (K siempre se detecta automáticamente)"
+    ),
 ):
     """
     Sube una imagen, ejecuta el pipeline de detección CMYK v3.2 y devuelve
@@ -88,11 +98,38 @@ async def analyze_image(
         roi_margin=roi_margin,
         search_radius=110,
         min_pixels=min_pixels,
+        channels=channels,  # Pasar los canales seleccionados
     )
 
     if cmyk_marks is None:
         raise HTTPException(status_code=422, detail="No se detectaron marcas K en la imagen.")
 
+    # Calcular factor óptico según método elegido
+    mm_per_px = None
+    if calibration_method == CalibrationMethod.MARK_SIZE:
+        if not mark_size_mm:
+            raise HTTPException(
+                status_code=422,
+                detail="mark_size_mm requerido cuando calibration_method='mark_size'"
+            )
+        # k_marks[0] = (cx, cy, score, scale)
+        # Tamaño del registro detectado en píxeles
+        mark_size_px = 101 * k_marks[0][3]  # template_size * scale
+        mm_per_px = calculate_mm_per_pixel(
+            calibration_method.value,
+            img_bgr.shape[1],
+            mark_size_mm=mark_size_mm,
+            mark_size_px=mark_size_px,
+        )
+    else:
+        mm_per_px = calculate_mm_per_pixel(
+            calibration_method.value,
+            img_bgr.shape[1],
+        )
+
+    # Filtrar canales solicitados
+    channels_list = [ch.value for ch in channels]
+    
     # Guardar outputs opcionales
     output_files: dict[str, str] = {}
     if save_outputs:
@@ -102,17 +139,22 @@ async def analyze_image(
             name_no_ext=name_no_ext,
             filename=filename,
             roi_margin=roi_margin,
+            mm_per_px=mm_per_px,
+            calibration_method=calibration_method.value,
+            mark_size_mm=mark_size_mm,
         )
 
-    channels_detected = sum(1 for ch in ['C', 'M', 'Y', 'K'] if cmyk_marks.get(ch))
+    channels_detected = sum(
+        1 for ch in channels_list if cmyk_marks.get(ch)
+    )
 
     return DetectionResult(
         filename=filename,
         channels_detected=channels_detected,
-        C=_build_channel_result('C', cmyk_marks, diag_por_canal),
-        M=_build_channel_result('M', cmyk_marks, diag_por_canal),
-        Y=_build_channel_result('Y', cmyk_marks, diag_por_canal),
-        K=_build_channel_result('K', cmyk_marks, diag_por_canal),
+        C=_build_channel_result('C', cmyk_marks, diag_por_canal) if 'C' in channels_list else None,
+        M=_build_channel_result('M', cmyk_marks, diag_por_canal) if 'M' in channels_list else None,
+        Y=_build_channel_result('Y', cmyk_marks, diag_por_canal) if 'Y' in channels_list else None,
+        K=_build_channel_result('K', cmyk_marks, diag_por_canal),  # K siempre se incluye
         output_files=output_files,
     )
 
