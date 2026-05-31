@@ -69,6 +69,7 @@ def calculate_mm_per_pixel(
     image_width_px: int,
     mark_size_mm: float = None,
     mark_size_px: float = None,
+    camera_distance_mm: float = None,  
 ):
     """
     Calcula mm/pixel según el método elegido.
@@ -78,14 +79,15 @@ def calculate_mm_per_pixel(
         image_width_px: Ancho de la imagen en píxeles
         mark_size_mm: Tamaño conocido del registro en mm (para MARK_SIZE)
         mark_size_px: Tamaño del registro detectado en píxeles (para MARK_SIZE)
+        camera_distance_mm: Distancia cámara-plano en mm (para CAMERA_DISTANCE)
     """
     if method == "camera_distance":
-        # Método 1: usar parámetros ópticos fijos
+        # Usar parámetro proporcionado o default para evitar errores
+        dist = camera_distance_mm if camera_distance_mm is not None else distancia_camara_plano_mm
         tamano_pixel_mm = sensor_width_mm / image_width_px
-        return (tamano_pixel_mm * distancia_camara_plano_mm) / focal_mm
+        return (tamano_pixel_mm * dist) / focal_mm
     
     elif method == "mark_size":
-        # Método 2: usar tamaño conocido del registro
         if not mark_size_mm or not mark_size_px:
             raise ValueError("mark_size_mm y mark_size_px requeridos para MARK_SIZE")
         return mark_size_mm / mark_size_px

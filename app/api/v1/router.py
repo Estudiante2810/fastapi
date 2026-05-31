@@ -72,6 +72,7 @@ async def analyze_image(
         description="Método para calcular mm/pixel"
     ),
     mark_size_mm: float = Query(None, description="Tamaño conocido del registro en mm (si usa MARK_SIZE)"),
+    camera_distance_mm: float = Query(None, description="Distancia cámara-plano en mm (si usa CAMERA_DISTANCE)"), 
     channels: list[CMYKChannel] = Query(
         [CMYKChannel.C, CMYKChannel.M, CMYKChannel.Y],
         description="Canales C, M, Y a analizar (K siempre se detecta automáticamente)"
@@ -121,10 +122,11 @@ async def analyze_image(
             mark_size_mm=mark_size_mm,
             mark_size_px=mark_size_px,
         )
-    else:
+    else:  # CAMERA_DISTANCE
         mm_per_px = calculate_mm_per_pixel(
             calibration_method.value,
             img_bgr.shape[1],
+            camera_distance_mm=camera_distance_mm, 
         )
 
     # Filtrar canales solicitados
@@ -142,6 +144,7 @@ async def analyze_image(
             mm_per_px=mm_per_px,
             calibration_method=calibration_method.value,
             mark_size_mm=mark_size_mm,
+            camera_distance_mm=camera_distance_mm,  
         )
 
     channels_detected = sum(

@@ -141,6 +141,7 @@ def build_calc_panel(
     filename: str = '',
     calibration_method: str = 'camera_distance',
     mark_size_mm: float = None,
+    camera_distance_mm: float = None,
     mm_per_px: float = None,
 ) -> np.ndarray:
     """
@@ -161,12 +162,13 @@ def build_calc_panel(
         if cmyk_marks.get(ch)
     }
 
-    # Texto diferente según el método de calibración
+    # Usar camera_distance_mm si se proporciona, sino usar el default
     if calibration_method == 'mark_size' and mark_size_mm:
         calibration_text = f'Calibrado con marca de {mark_size_mm} mm'
     else:
+        dist = camera_distance_mm if camera_distance_mm is not None else distancia_camara_plano_mm
         calibration_text = (
-            f'Dist. camara-plano: {distancia_camara_plano_mm} mm  |  Focal: {focal_mm} mm'
+            f'Dist. camara-plano: {dist} mm  |  Focal: {focal_mm} mm'
         )
 
     lines = [
@@ -235,6 +237,7 @@ def save_all_outputs(
     mm_per_px: float = None,
     calibration_method: str = 'camera_distance',
     mark_size_mm: float = None,
+    camera_distance_mm: float = None,
 ) -> dict[str, str]:
     """
     Guarda los 3 archivos JPG de salida y retorna un dict con las rutas.
@@ -247,6 +250,7 @@ def save_all_outputs(
         img_bgr, cmyk_marks, k_marks, filename,
         calibration_method=calibration_method,
         mark_size_mm=mark_size_mm,
+        camera_distance_mm=camera_distance_mm,
         mm_per_px=mm_per_px,
     )
 
