@@ -64,6 +64,16 @@ CLUSTERING_SIGMA  = 40.0
 
 TEMPLATE_SIZE = 101  # Tamaño del template de detección en píxeles
 
+
+# ═══════════════════════════════════════════════════════════════════════════
+# NORMALIZACIÓN DE FONDO BLANCO (v3.2+)
+# ═══════════════════════════════════════════════════════════════════════════
+WHITE_BG_NORMALIZE = True              # Activar/desactivar normalización
+WHITE_L_THRESHOLD = 150                # Threshold de luminancia (L en LAB)
+WHITE_TOLERANCE_MIN = 15               # Tolerancia mínima (RGB equivalente)
+WHITE_TOLERANCE_MAX = 50               # Tolerancia máxima (RGB equivalente)
+WHITE_SIGMA_FACTOR = 1.0   
+
 def calculate_mm_per_pixel(
     method: str,
     image_width_px: int,

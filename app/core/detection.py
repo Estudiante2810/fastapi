@@ -8,9 +8,15 @@ y template matching sobre imágenes de canal aislado.
 import cv2
 import numpy as np
 
-from app.core.config import CLUSTERING_SIGMA, CMY_CROP_RANGES
-from app.core.image_utils import multi_scale_template_match
-
+from app.core.config import (
+    CLUSTERING_SIGMA, CMY_CROP_RANGES, WHITE_BG_NORMALIZE, 
+    WHITE_L_THRESHOLD, WHITE_TOLERANCE_MIN, WHITE_TOLERANCE_MAX, 
+    WHITE_SIGMA_FACTOR
+)
+from app.core.image_utils import (
+    multi_scale_template_match, normalize_white_background,
+    preprocess_image, non_max_suppression
+)
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -195,6 +201,17 @@ def detectar_canal(
         crop_bgr   = img_bgr[ry1:ry2, rx1:rx2].copy()
         k_local_cx = int(kcx) - rx1
         k_local_cy = int(kcy) - ry1
+
+                # ── PASO 0.5: Normalizar fondo blanco (v3.2+) ──
+        if WHITE_BG_NORMALIZE:
+            crop_bgr = normalize_white_background(
+                crop_bgr,
+                l_threshold=WHITE_L_THRESHOLD,
+                min_tolerance=WHITE_TOLERANCE_MIN,
+                max_tolerance=WHITE_TOLERANCE_MAX,
+                sigma_factor=WHITE_SIGMA_FACTOR
+            )
+            print(f"  │  ✓ Fondo blanco normalizado")
 
         img_isolated, mask_full, mask_near, crop_enhanced, diag_masks = crear_imagen_canal_color(
             crop_bgr, ch_name, ch_info, k_local_cx, k_local_cy, search_radius
