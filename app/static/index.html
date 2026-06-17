@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Detección de Marcas CMYK</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 900px;
+            width: 100%;
+            padding: 40px;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            text-align: center;
+        }
+
+        .subtitle {
+            color: #666;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .section {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .section h2 {
+            font-size: 18px;
+            color: #667eea;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        video {
+            width: 100%;
+            border-radius: 10px;
+            background: #000;
+            display: block;
+            margin-bottom: 15px;
+        }
+
+        canvas {
+            display: none;
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            flex: 1;
+            min-width: 120px;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-primary:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-secondary {
+            background: #f5f5f5;
+            color: #333;
+            border: 1px solid #ddd;
+        }
+
+        .btn-secondary:hover {
+            background: #efefef;
+        }
+
+        .btn-secondary:disabled {
+            background: #f5f5f5;
+            color: #999;
+            cursor: not-allowed;
+        }
+
+        .btn-danger {
+            background: #ff6b6b;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #ff5252;
+            transform: translateY(-2px);
+        }
+
+        .captured-image {
+            width: 100%;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            display: none;
+        }
+
+        .captured-image.show {
+            display: block;
+        }
+
+        .results {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .results h3 {
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+
+        .channel-result {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 12px;
+            border-left: 4px solid #667eea;
+        }
+
+        .channel-result.detected {
+            border-left-color: #51cf66;
+        }
+
+        .channel-result.not-detected {
+            border-left-color: #ffa8a8;
+        }
+
+        .channel-name {
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .channel-details {
+            font-size: 13px;
+            color: #666;
+            line-height: 1.6;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .status-badge.detected {
+            background: #d3f9d8;
+            color: #2f9e44;
+        }
+
+        .status-badge.not-detected {
+            background: #ffe0e0;
+            color: #c92a2a;
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error {
+            background: #ffe0e0;
+            color: #c92a2a;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .error.show {
+            display: block;
+        }
+
+        .success {
+            background: #d3f9d8;
+            color: #2f9e44;
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 15px;
+            display: none;
+        }
+
+        .success.show {
+            display: block;
+        }
+
+        .info-box {
+            background: #e7f5ff;
+            border-left: 4px solid #4dabf7;
+            padding: 15px;
+            border-radius: 8px;
+            color: #1971c2;
+            font-size: 13px;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Detección de Marcas CMYK</h1>
+
+        <div class="main-content">
+            <div class="section">
+                <h2>Cámara en Vivo</h2>
+                <video id="video" autoplay playsinline></video>
+                <div class="controls">
+                    <button class="btn-primary" id="captureBtn">Capturar Foto</button>
+                    <button class="btn-secondary" id="toggleCameraBtn">Iniciar Cámara</button>
+                </div>
+                <div class="error" id="cameraError"></div>
+            </div>
+
+            <div class="section">
+                <h2>Foto Capturada</h2>
+                <img id="capturedImage" class="captured-image" alt="Foto capturada">
+                <div class="controls">
+                    <button class="btn-primary" id="analyzeBtn" disabled>Analizar Imagen</button>
+                    <button class="btn-secondary" id="clearBtn" disabled>Limpiar</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Analizando imagen...</p>
+        </div>
+
+        <div class="error" id="error"></div>
+        <div class="success" id="success"></div>
+
+        <div class="results" id="results" style="display: none;">
+            <h3>Resultados del Análisis</h3>
+            <div id="resultsContent"></div>
+        </div>
+    </div>
+
+    <canvas id="canvas"></canvas>
+
+    <script>
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const capturedImage = document.getElementById('capturedImage');
+        const toggleCameraBtn = document.getElementById('toggleCameraBtn');
+        const captureBtn = document.getElementById('captureBtn');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        const loading = document.getElementById('loading');
+        const error = document.getElementById('error');
+        const success = document.getElementById('success');
+        const results = document.getElementById('results');
+        const resultsContent = document.getElementById('resultsContent');
+        const cameraError = document.getElementById('cameraError');
+
+        let stream = null;
+        let isCameraActive = false;
+        let capturedImageData = null;
+
+        // Inicializar cámara
+        async function initCamera() {
+            try {
+                cameraError.classList.remove('show');
+                cameraError.textContent = '';
+
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    throw new Error('Tu navegador no soporta acceso a cámara');
+                }
+
+                stream = await navigator.mediaDevices.getUserMedia({
+                    video: {
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 },
+                        facingMode: 'user'
+                    }
+                });
+
+                video.srcObject = stream;
+                isCameraActive = true;
+                toggleCameraBtn.textContent = 'Detener Cámara';
+                toggleCameraBtn.classList.add('btn-danger');
+                toggleCameraBtn.classList.remove('btn-secondary');
+                captureBtn.disabled = false;
+            } catch (err) {
+                cameraError.classList.add('show');
+                cameraError.textContent = `Error: ${err.message}. Verifica que hayas permitido acceso a la cámara.`;
+                console.error('Error al acceder a la cámara:', err);
+            }
+        }
+
+        // Detener cámara
+        function stopCamera() {
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                stream = null;
+                isCameraActive = false;
+            }
+            video.srcObject = null;
+            toggleCameraBtn.textContent = 'Iniciar Cámara';
+            toggleCameraBtn.classList.remove('btn-danger');
+            toggleCameraBtn.classList.add('btn-secondary');
+            captureBtn.disabled = true;
+        }
+
+        // Toggle cámara
+        toggleCameraBtn.addEventListener('click', () => {
+            if (isCameraActive) {
+                stopCamera();
+            } else {
+                initCamera();
+            }
+        });
+
+        // Capturar foto
+        captureBtn.addEventListener('click', () => {
+            if (!isCameraActive || !video.srcObject) {
+                error.classList.add('show');
+                error.textContent = 'La cámara no está activa';
+                return;
+            }
+
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0);
+
+            capturedImageData = canvas.toDataURL('image/jpeg', 0.95);
+            capturedImage.src = capturedImageData;
+            capturedImage.classList.add('show');
+            analyzeBtn.disabled = false;
+            clearBtn.disabled = false;
+
+            error.classList.remove('show');
+            success.classList.remove('show');
+            results.style.display = 'none';
+
+            // Analizar automáticamente después de capturar
+            setTimeout(() => {
+                analyzeImage();
+            }, 500);
+        });
+
+        // Función para analizar imagen
+        async function analyzeImage() {
+            if (!capturedImageData) {
+                error.classList.add('show');
+                error.textContent = 'No hay imagen capturada';
+                return;
+            }
+
+            try {
+                loading.style.display = 'block';
+                error.classList.remove('show');
+                success.classList.remove('show');
+                results.style.display = 'none';
+
+                // Convertir base64 a blob
+                const res = await fetch(capturedImageData);
+                const blob = await res.blob();
+
+                // Crear FormData
+                const formData = new FormData();
+                formData.append('file', blob, 'capture.jpg');
+
+                // Enviar al backend con camera_distance_mm=25 y todos los canales
+                const url = new URL('/api/v1/detection/analyze', window.location.origin);
+                url.searchParams.append('camera_distance_mm', '25');
+                url.searchParams.append('channels', 'C');
+                url.searchParams.append('channels', 'M');
+                url.searchParams.append('channels', 'Y');
+                url.searchParams.append('save_outputs', 'true');
+
+                const response = await fetch(url.toString(), {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || 'Error en el servidor');
+                }
+
+                const data = await response.json();
+                displayResults(data);
+                success.classList.add('show');
+                success.textContent = '✓ Análisis completado exitosamente';
+            } catch (err) {
+                error.classList.add('show');
+                error.textContent = `Error: ${err.message}`;
+                console.error('Error:', err);
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        // Analizar imagen manualmente (botón)
+        analyzeBtn.addEventListener('click', () => {
+            analyzeImage();
+        });
+
+        // Limpiar
+        clearBtn.addEventListener('click', () => {
+            capturedImage.classList.remove('show');
+            capturedImageData = null;
+            analyzeBtn.disabled = true;
+            clearBtn.disabled = true;
+            error.classList.remove('show');
+            success.classList.remove('show');
+            results.style.display = 'none';
+        });
+
+        // Mostrar resultados
+        function displayResults(data) {
+            resultsContent.innerHTML = '';
+
+            const channels = ['C', 'M', 'Y', 'K'];
+            channels.forEach(channel => {
+                const channelData = data[channel];
+                if (channelData) {
+                    const div = document.createElement('div');
+                    div.className = `channel-result ${channelData.detected ? 'detected' : 'not-detected'}`;
+
+                    const status = channelData.detected ? 'Detectado ✓' : 'No detectado';
+                    const statusClass = channelData.detected ? 'detected' : 'not-detected';
+
+                    let html = `<div class="channel-name">
+                        Canal ${channel}
+                        <span class="status-badge ${statusClass}">${status}</span>
+                    </div>`;
+
+                    if (channelData.detected && channelData.mark) {
+                        html += `<div class="channel-details">
+                            <div>Posición X: ${channelData.mark.x} px</div>
+                            <div>Posición Y: ${channelData.mark.y} px</div>
+                            <div>Confianza: ${(channelData.mark.score * 100).toFixed(2)}%</div>
+                            <div>Escala: ${channelData.mark.scale}x</div>
+                            <div>Píxeles: ${channelData.pixel_count}</div>
+                        </div>`;
+                    } else {
+                        html += `<div class="channel-details">
+                            No se encontraron marcas en este canal
+                        </div>`;
+                    }
+
+                    div.innerHTML = html;
+                    resultsContent.appendChild(div);
+                }
+            });
+
+            results.style.display = 'block';
+        }
+
+        // Auto-iniciar cámara al cargar la página
+        window.addEventListener('load', () => {
+            // Opcional: descomentar para auto-iniciar
+            // initCamera();
+        });
+    </script>
+</body>
+</html>

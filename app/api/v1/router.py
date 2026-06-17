@@ -22,6 +22,9 @@ from app.core.output_builder import save_all_outputs
 from app.schemas.detection import DetectionResult, ChannelResult, MarkPosition
 from app.schemas.calibration import CalibrationMethod, CMYKChannel
 
+from print_registry.storage.base import ColorResult, AnalysisRecord, StorageBackend
+from print_registry.AnalysisRecord.local_storage import LocalStorage
+
 router = APIRouter(prefix="/detection", tags=["detection"])
 
 # Plantilla global (se crea una vez al cargar el módulo)
@@ -32,6 +35,7 @@ _TEMPLATE = create_crosshair_template(
 
 OUTPUT_DIR = os.environ.get("OUTPUT_DIR", "resultados")
 
+storage = LocalStorage(base_dir="print_registry_data")
 
 def _decode_image(file_bytes: bytes) -> np.ndarray:
     """Decodifica bytes de imagen a array BGR de OpenCV."""
@@ -147,6 +151,30 @@ async def analyze_image(
             camera_distance_mm=camera_distance_mm,  
         )
 
+    color_results = [
+        ColorResult(
+            name=ch,
+            coordinates={
+                "x": int(cmyk_marks[ch][0][0]),
+                "y": int(cmyk_marks[ch][0][1]),
+            },
+            confidence=round(float(cmyk_marks[ch][0][2]), 4),
+            extra={"scale": round(float(cmyk_marks[ch][0][3]), 3)},
+        )
+        for ch in ["C", "M", "Y", "K"]
+        if cmyk_marks.get(ch)
+    ]
+    storage.save(
+        image_bytes=raw,
+        filename=filename,
+        results=color_results,
+        metadata={
+            "roi_margin": roi_margin,
+            "calibration_method": calibration_method.value,
+            "mm_per_px": mm_per_px,
+        },
+    )
+    
     channels_detected = sum(
         1 for ch in channels_list if cmyk_marks.get(ch)
     )
