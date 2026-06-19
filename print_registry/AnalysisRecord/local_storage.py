@@ -11,7 +11,6 @@ from pathlib import Path
 
 from print_registry.storage.base import AnalysisRecord, ColorResult, StorageBackend
 
-
 class LocalStorage(StorageBackend):
     """
     Guarda todo en el sistema de archivos local.
@@ -42,9 +41,9 @@ class LocalStorage(StorageBackend):
         image_bytes: bytes,
         filename: str,
         results: list[ColorResult],
+        output_files: dict | None = None,   # ← nuevo parámetro
         metadata: dict | None = None,
     ) -> AnalysisRecord:
-        """Guarda la imagen en disco y los resultados en un JSON."""
 
         record = AnalysisRecord(
             image_filename=filename,
@@ -52,13 +51,23 @@ class LocalStorage(StorageBackend):
             metadata=metadata or {},
         )
 
-        # 1. Guardar imagen con el ID como prefijo para evitar colisiones
-        safe_filename = f"{record.id}_{filename}"
-        image_path = self.images_dir / safe_filename
-        image_path.write_bytes(image_bytes)
-        record.image_path = str(image_path)
+        # Crear carpeta dedicada para este análisis
+        analysis_dir = self.images_dir / record.id
+        analysis_dir.mkdir(parents=True, exist_ok=True)
 
-        # 2. Serializar y guardar el JSON de resultados
+        # 1. Guardar imagen original en la carpeta
+        image_path = analysis_dir / filename
+        image_path.write_bytes(image_bytes)
+        record.image_path = str(analysis_dir)
+
+        # 2. Mover/copiar archivos de resultados a la misma carpeta
+        if output_files:
+            for key, src_path in output_files.items():
+                src = Path(src_path)
+                if src.exists():
+                    shutil.copy2(src, analysis_dir / src.name)
+
+        # 3. Guardar JSON de resultados
         result_path = self.results_dir / f"{record.id}.json"
         result_path.write_text(
             json.dumps(self._record_to_dict(record), indent=2, ensure_ascii=False),
@@ -66,7 +75,7 @@ class LocalStorage(StorageBackend):
         )
 
         print(f"[LocalStorage] ✓ Guardado: {record.id}")
-        print(f"  Imagen   → {image_path}")
+        print(f"  Carpeta  → {analysis_dir}")
         print(f"  Results  → {result_path}")
 
         return record
@@ -108,7 +117,7 @@ class LocalStorage(StorageBackend):
             image_path.unlink()
 
         result_path.unlink()
-        print(f"[LocalStorage] 🗑 Eliminado: {record_id}")
+        print(f"[LocalStorage] Eliminado: {record_id}")
         return True
 
     # ------------------------------------------------------------------

@@ -276,6 +276,12 @@
     <div class="container">
         <h1>Detección de Marcas CMYK</h1>
 
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h1 style="margin-bottom: 0;">Detección de Marcas CMYK</h1>
+                <button class="btn-secondary" id="viewHistoryBtn" style="flex: none; padding: 10px 16px;">Ver resultados pasados</button>
+        </div>
+
+        <div id="mainView">
         <div class="main-content">
             <div class="section">
                 <h2>Cámara en Vivo</h2>
@@ -308,6 +314,29 @@
         <div class="results" id="results" style="display: none;">
             <h3>Resultados del Análisis</h3>
             <div id="resultsContent"></div>
+        </div>
+        </div>
+        <div id="historyView" style="display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 style="color: #667eea; border-bottom: 2px solid #667eea; padding-bottom: 10px; flex: 1;">Resultados Pasados</h2>
+                <button class="btn-secondary" id="backToMainBtn" style="flex: none; margin-left: 15px;">← Volver</button>
+            </div>
+
+            <div class="loading" id="historyLoading" style="display: none;">
+                <div class="spinner"></div>
+                <p>Cargando resultados...</p>
+            </div>
+
+            <div class="error" id="historyError"></div>
+
+            <div id="historyList"></div>
+
+            <!-- Detalle de un análisis seleccionado -->
+            <div id="historyDetail" style="display: none; margin-top: 20px;">
+                <button class="btn-secondary" id="backToListBtn" style="margin-bottom: 15px;">← Volver a la lista</button>
+                <img id="historyDetailImage" style="width: 100%; border-radius: 10px; margin-bottom: 15px;" alt="Imagen del análisis">
+                <div id="historyDetailContent"></div>
+            </div>
         </div>
     </div>
 
@@ -530,6 +559,146 @@
             // Opcional: descomentar para auto-iniciar
             // initCamera();
         });
+
+        // ============ HISTORIAL ============
+        const mainView = document.getElementById('mainView');
+        const historyView = document.getElementById('historyView');
+        const viewHistoryBtn = document.getElementById('viewHistoryBtn');
+        const backToMainBtn = document.getElementById('backToMainBtn');
+        const backToListBtn = document.getElementById('backToListBtn');
+        const historyLoading = document.getElementById('historyLoading');
+        const historyError = document.getElementById('historyError');
+        const historyList = document.getElementById('historyList');
+        const historyDetail = document.getElementById('historyDetail');
+        const historyDetailImage = document.getElementById('historyDetailImage');
+        const historyDetailContent = document.getElementById('historyDetailContent');
+
+        viewHistoryBtn.addEventListener('click', () => {
+            mainView.style.display = 'none';
+            historyView.style.display = 'block';
+            loadHistory();
+        });
+
+        backToMainBtn.addEventListener('click', () => {
+            historyView.style.display = 'none';
+            mainView.style.display = 'block';
+        });
+
+        backToListBtn.addEventListener('click', () => {
+            historyDetail.style.display = 'none';
+            historyList.style.display = 'block';
+        });
+
+        async function loadHistory() {
+            historyError.classList.remove('show');
+            historyList.innerHTML = '';
+            historyDetail.style.display = 'none';
+            historyList.style.display = 'block';
+            historyLoading.style.display = 'block';
+
+            try {
+                const response = await fetch('/api/v1/detection/history');
+                if (!response.ok) throw new Error('No se pudo cargar el historial');
+                const records = await response.json();
+
+                if (records.length === 0) {
+                    historyList.innerHTML = '<p style="color: #666;">Aún no hay análisis guardados.</p>';
+                    return;
+                }
+
+                records.forEach(record => {
+                    const item = document.createElement('div');
+                    item.className = 'channel-result';
+                    item.style.cursor = 'pointer';
+
+                    const date = new Date(record.timestamp).toLocaleString('es-DO');
+                    const colorCount = record.colors.length;
+
+                    item.innerHTML = `
+                        <div class="channel-name">${record.image_filename}</div>
+                        <div class="channel-details">
+                            <div>Fecha: ${date}</div>
+                            <div>Canales detectados: ${colorCount}</div>
+                        </div>
+                    `;
+
+                    item.addEventListener('click', () => showHistoryDetail(record));
+                    historyList.appendChild(item);
+                });
+            } catch (err) {
+                historyError.classList.add('show');
+                historyError.textContent = `Error: ${err.message}`;
+            } finally {
+                historyLoading.style.display = 'none';
+            }
+        }
+
+        async function showHistoryDetail(record) {
+            historyList.style.display = 'none';
+            historyDetail.style.display = 'block';
+
+            // Limpiar galería anterior
+            historyDetailImage.style.display = 'none';
+            const oldGallery = document.getElementById('historyImageGallery');
+            if (oldGallery) oldGallery.remove();
+
+            // Crear contenedor de galería
+            const gallery = document.createElement('div');
+            gallery.id = 'historyImageGallery';
+            gallery.style.display = 'grid';
+            gallery.style.gridTemplateColumns = 'repeat(auto-fit, minmax(150px, 1fr))';
+            gallery.style.gap = '10px';
+            gallery.style.marginBottom = '15px';
+            historyDetailImage.parentNode.insertBefore(gallery, historyDetailImage);
+
+            try {
+                const res = await fetch(`/api/v1/detection/history/${record.id}/images`);
+                if (res.ok) {
+                    const data = await res.json();
+                    data.filenames.forEach(filename => {
+                        const img = document.createElement('img');
+                        img.src = `/api/v1/detection/history/${record.id}/images/${filename}`;
+                        img.alt = filename;
+                        img.title = filename;
+                        img.style.width = '100%';
+                        img.style.borderRadius = '8px';
+                        img.style.cursor = 'pointer';
+                        img.onclick = () => window.open(img.src, '_blank');
+                        gallery.appendChild(img);
+                    });
+                }
+            } catch (err) {
+                console.error('Error cargando imágenes:', err);
+            }
+
+            let html = `<h3>${record.image_filename}</h3>
+                <p style="color: #666; margin-bottom: 15px;">
+                    ${new Date(record.timestamp).toLocaleString('es-DO')}
+                </p>`;
+
+            record.colors.forEach(c => {
+                html += `<div class="channel-result detected">
+                    <div class="channel-name">Canal ${c.name}</div>
+                    <div class="channel-details">
+                        <div>Posición X: ${c.coordinates.x} px</div>
+                        <div>Posición Y: ${c.coordinates.y} px</div>
+                        <div>Confianza: ${(c.confidence * 100).toFixed(2)}%</div>
+                        ${c.extra && c.extra.scale ? `<div>Escala: ${c.extra.scale}x</div>` : ''}
+                    </div>
+                </div>`;
+            });
+
+            if (record.metadata && Object.keys(record.metadata).length > 0) {
+                html += `<div class="channel-result">
+                    <div class="channel-name">Metadata</div>
+                    <div class="channel-details">
+                        ${Object.entries(record.metadata).map(([k, v]) => `<div>${k}: ${v}</div>`).join('')}
+                    </div>
+                </div>`;
+            }
+
+            historyDetailContent.innerHTML = html;
+        }
     </script>
 </body>
 </html>

@@ -40,7 +40,13 @@ class StorageBackend(ABC):
     """
 
     @abstractmethod
-    def save(self, image_bytes: bytes, filename: str, results: list[ColorResult], metadata: dict | None = None) -> AnalysisRecord:
+    def save(self, 
+             image_bytes: bytes, 
+             filename: str, 
+             results: list[ColorResult], 
+             output_files: dict | None = None,
+             metadata: dict | None = None
+    ) -> AnalysisRecord:
         """
         Guarda la imagen y los resultados de detección.
 
@@ -69,35 +75,3 @@ class StorageBackend(ABC):
     def delete(self, record_id: str) -> bool:
         """Elimina un registro. Devuelve True si existía."""
         ...
-
-class LocalStorage(StorageBackend):
-    def __init__(self, base_dir: str = "print_registry_data"):
-        self.base_dir = base_dir
-        os.makedirs(base_dir, exist_ok=True)
-
-    def save(self, image_bytes, filename, results, metadata=None) -> AnalysisRecord:
-        record = AnalysisRecord(
-            image_filename=filename,
-            colors=results,
-            metadata=metadata or {},
-        )
-        # Guarda imagen
-        img_path = os.path.join(self.base_dir, record.id + "_" + filename)
-        with open(img_path, "wb") as f:
-            f.write(image_bytes)
-        record.image_path = img_path
-        # Guarda JSON
-        json_path = os.path.join(self.base_dir, record.id + ".json")
-        with open(json_path, "w") as f:
-            json.dump({"id": record.id, "filename": filename, "metadata": metadata}, f)
-        return record
-
-    def get(self, record_id):
-        # Implementación básica
-        return None
-
-    def list_all(self):
-        return []
-
-    def delete(self, record_id):
-        return False

@@ -168,6 +168,7 @@ async def analyze_image(
         image_bytes=raw,
         filename=filename,
         results=color_results,
+        output_files=output_files,
         metadata={
             "roi_margin": roi_margin,
             "calibration_method": calibration_method.value,
@@ -201,3 +202,101 @@ async def get_output_file(filename: str):
     if not os.path.isfile(path):
         raise HTTPException(status_code=404, detail=f"Archivo no encontrado: {filename}")
     return FileResponse(path, media_type="image/jpeg", filename=filename)
+
+@router.get(
+    "/history",
+    summary="Lista todos los análisis pasados",
+)
+async def get_history():
+    """Devuelve todos los registros guardados, más recientes primero."""
+    records = storage.list_all()
+    return [
+        {
+            "id": r.id,
+            "timestamp": r.timestamp.isoformat(),
+            "image_filename": r.image_filename,
+            "colors": [
+                {
+                    "name": c.name,
+                    "coordinates": c.coordinates,
+                    "confidence": c.confidence,
+                    "hex_value": c.hex_value,
+                    "extra": c.extra,
+                }
+                for c in r.colors
+            ],
+            "metadata": r.metadata,
+        }
+        for r in records
+    ]
+
+
+@router.get(
+    "/history/{record_id}",
+    summary="Obtiene el detalle de un análisis pasado por ID",
+)
+async def get_history_detail(record_id: str):
+    record = storage.get(record_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail=f"Registro no encontrado: {record_id}")
+    return {
+        "id": record.id,
+        "timestamp": record.timestamp.isoformat(),
+        "image_filename": record.image_filename,
+        "colors": [
+            {
+                "name": c.name,
+                "coordinates": c.coordinates,
+                "confidence": c.confidence,
+                "hex_value": c.hex_value,
+                "extra": c.extra,
+            }
+            for c in record.colors
+        ],
+        "metadata": record.metadata,
+    }
+
+
+@router.get(
+    "/history/{record_id}/images",
+    summary="Lista todas las imágenes guardadas de un análisis pasado",
+)
+async def list_history_images(record_id: str):
+    """Devuelve los nombres de todos los archivos en la carpeta image_path."""
+    record = storage.get(record_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail=f"Registro no encontrado: {record_id}")
+
+    folder = record.image_path
+    if not folder or not os.path.isdir(folder):
+        raise HTTPException(status_code=404, detail="Carpeta de imágenes no encontrada.")
+
+    filenames = sorted(
+        f for f in os.listdir(folder)
+        if os.path.isfile(os.path.join(folder, f))
+    )
+    return {"id": record_id, "filenames": filenames}
+
+@router.get(
+    "/history/{record_id}/images/{filename}",
+    summary="Descarga una imagen específica de un análisis pasado",
+    response_class=FileResponse,
+)
+async def get_history_image(record_id: str, filename: str):
+    """Sirve un archivo puntual dentro de la carpeta image_path."""
+    record = storage.get(record_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail=f"Registro no encontrado: {record_id}")
+
+    folder = record.image_path
+    if not folder or not os.path.isdir(folder):
+        raise HTTPException(status_code=404, detail="Carpeta de imágenes no encontrada.")
+
+    # Evitar path traversal (ej: ../../etc/passwd)
+    safe_name = os.path.basename(filename)
+    file_path = os.path.join(folder, safe_name)
+
+    if not os.path.isfile(file_path):
+        raise HTTPException(status_code=404, detail=f"Archivo no encontrado: {filename}")
+
+    return FileResponse(file_path, media_type="image/jpeg", filename=safe_name)
