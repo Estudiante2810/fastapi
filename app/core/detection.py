@@ -125,16 +125,27 @@ def crear_imagen_canal_color(
                 mask_hsv_sin_boost, cv2.inRange(crop_hsv, lower, upper)
             )
         color_mask = mask_hsv_sin_boost.copy()
+        """
         if ch_info.get('usar_lab_bgr', False):
             lab_m_mask = cv2.bitwise_and(
                 cv2.inRange(a_ch, np.array([138]), np.array([255])),
-                cv2.inRange(L_ch, np.array([15]),  np.array([200])),
+                cv2.inRange(L_ch, np.array([15]),  np.array([200]))
             )
+            
             bgr_m_mask = (
-                (R_i > B_i + 5) & (R_i > G_i + 5) & (R_i > 30) & (np.abs(R_i - B_i) > 10)
+                (R_i > B_i + 5) & (R_i > G_i + 5) & (R_i > 30) &
+                (np.abs(R_i - B_i) > 10)
             ).astype(np.uint8) * 255
+            
             mask_lab_bgr = cv2.bitwise_or(lab_m_mask, bgr_m_mask)
-            color_mask = mask_lab_bgr.copy()
+            color_mask   = cv2.bitwise_or(color_mask, mask_lab_bgr)
+            #color_mask = mask_lab_bgr.copy()
+        """
+        magenta_gray = np.clip(R_i - np.maximum(G_i, B_i), 0, 255).astype(np.uint8)
+        gray_th = ch_info.get('gray_threshold', 30)
+        _, mask_magenta_gray = cv2.threshold(magenta_gray, gray_th, 255, cv2.THRESH_BINARY)
+        mask_lab_bgr = mask_magenta_gray.astype(np.uint8)
+        color_mask   = cv2.bitwise_or(color_mask, mask_lab_bgr)
 
     elif ch_name == 'Y':
         for lower, upper in ch_info['hsv_ranges']:
