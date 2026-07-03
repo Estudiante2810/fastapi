@@ -1,0 +1,49 @@
+{
+  "id": "58fab7ac-ff95-4dde-8506-b7913079f247",
+  "timestamp": "2026-07-02T22:56:36.964113",
+  "image_filename": "capture.jpg",
+  "image_path": "print_registry_data\\images\\58fab7ac-ff95-4dde-8506-b7913079f247",
+  "colors": [
+    {
+      "name": "M",
+      "coordinates": {
+        "x": 889,
+        "y": 158
+      },
+      "confidence": 0.3269,
+      "hex_value": null,
+      "extra": {
+        "scale": 0.3
+      }
+    },
+    {
+      "name": "Y",
+      "coordinates": {
+        "x": 852,
+        "y": 115
+      },
+      "confidence": 0.4247,
+      "hex_value": null,
+      "extra": {
+        "scale": 0.45
+      }
+    },
+    {
+      "name": "K",
+      "coordinates": {
+        "x": 888,
+        "y": 156
+      },
+      "confidence": 0.4237,
+      "hex_value": null,
+      "extra": {
+        "scale": 0.45
+      }
+    }
+  ],
+  "metadata": {
+    "roi_margin": 230,
+    "calibration_method": "camera_distance",
+    "mm_per_px": 0.027343749999999997
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "id": "60137023-9caa-48e9-b7f9-a48f43951399",
+  "timestamp": "2026-07-02T23:10:41.728097",
+  "image_filename": "capture.jpg",
+  "image_path": "print_registry_data\\images\\60137023-9caa-48e9-b7f9-a48f43951399",
+  "colors": [
+    {
+      "name": "Y",
+      "coordinates": {
+        "x": 882,
+        "y": 370
+      },
+      "confidence": 0.3756,
+      "hex_value": null,
+      "extra": {
+        "scale": 0.55
+      }
+    },
+    {
+      "name": "K",
+      "coordinates": {
+        "x": 884,
+        "y": 368
+      },
+      "confidence": 0.6093,
+      "hex_value": null,
+      "extra": {
+        "scale": 0.55
+      }
+    }
+  ],
+  "metadata": {
+    "roi_margin": 230,
+    "calibration_method": "camera_distance",
+    "mm_per_px": 0.027343749999999997
+  }
+}

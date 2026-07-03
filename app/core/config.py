@@ -105,3 +105,15 @@ def calculate_mm_per_pixel(
     
     else:
         raise ValueError(f"Método desconocido: {method}")
+
+
+SIZE_ADAPTIVE_ENABLED = True
+BASE_TEMPLATE_SIZE = 101
+BASE_SEARCH_RADIUS = 110
+BASE_ROI_MARGIN = 230
+BASE_NMS_RADIUS = 110
+MIN_TEMPLATE_SIZE_PX = 20
+MIN_ROI_MARGIN        = 150   # px — nunca menos que esto
+MIN_SEARCH_RADIUS     = 80    # px — nunca menos que esto
+PX_MIN_ACCEPT_LOW     = 200
+SCORE_NORMALIZER_LOW  = 50

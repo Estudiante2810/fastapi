@@ -52,6 +52,10 @@ def create_crosshair_template(
     return template
 
 
+def generar_escalas_log(start=0.15, stop=3.2, num=25):
+    return np.logspace(np.log10(start), np.log10(stop), num=num)
+
+
 def multi_scale_template_match(
     gray: np.ndarray,
     template: np.ndarray,
@@ -64,13 +68,13 @@ def multi_scale_template_match(
     Retorna lista de (x, y, score, scale).
     """
     if scales is None:
-        scales = np.arange(0.3, 2.5, 0.1)
+        scales = generar_escalas_log(0.3, 2.5, 20)
     detections = []
     th, tw = template.shape[:2]
     for s in scales:
         new_w = int(tw * s)
         new_h = int(th * s)
-        if new_w < 20 or new_h < 20:
+        if new_w < 12 or new_h < 12:  # antes era 20
             continue
         if new_w > gray.shape[1] or new_h > gray.shape[0]:
             continue
