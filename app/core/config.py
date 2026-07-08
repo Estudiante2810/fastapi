@@ -65,6 +65,8 @@ CLUSTERING_SIGMA  = 40.0
 
 TEMPLATE_SIZE = 101  # Tamaño del template de detección en píxeles
 
+RING_RADIUS_PX = 40                    # radio del círculo de la marca, a escala 1.0
+MARK_DIAMETER_PX = 2 * RING_RADIUS_PX
 
 # ═══════════════════════════════════════════════════════════════════════════
 # NORMALIZACIÓN DE FONDO BLANCO (v3.2+)

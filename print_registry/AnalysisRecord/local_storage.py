@@ -94,11 +94,11 @@ class LocalStorage(StorageBackend):
 
     def list_all(self) -> list[AnalysisRecord]:
         """Lista todos los registros ordenados del más reciente al más antiguo."""
-        records = []
-        for path in sorted(self.results_dir.glob("*.json"), reverse=True):
-            data = json.loads(path.read_text(encoding="utf-8"))
-            records.append(self._dict_to_record(data))
-        return records
+        records = [
+            self._dict_to_record(json.loads(path.read_text(encoding="utf-8")))
+            for path in self.results_dir.glob("*.json")
+        ]
+        return sorted(records, key=lambda r: r.timestamp, reverse=True)
 
     # ------------------------------------------------------------------
     # Eliminar
