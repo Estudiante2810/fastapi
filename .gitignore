@@ -39,6 +39,7 @@ Thumbs.db
 
 # Project specific
 resultados/
+print_registry_data/
 *.jpg
 *.png
 *.jpeg
