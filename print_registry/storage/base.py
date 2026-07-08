@@ -5,7 +5,7 @@ Implementa esta clase para agregar cualquier nuevo backend (Firebase, S3, etc.)
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 import uuid
 import json
