@@ -10,7 +10,7 @@ import numpy as np
 
 from app.core.config import (
     CMY_CROP_RANGES, COLORS_LABEL, offsets_label,
-    distancia_camara_plano_mm, focal_mm, sensor_width_mm,
+    distancia_camara_plano_mm, focal_mm, sensor_width_mm, FACTOR_CORRECION_MM
 )
 
 
@@ -152,7 +152,7 @@ def build_calc_panel(
     # Si no se pasó mm_per_px, calcular con el método por defecto
     if mm_per_px is None:
         tamano_pixel_mm = sensor_width_mm / image_width_px
-        mm_por_px = (tamano_pixel_mm * distancia_camara_plano_mm) / focal_mm
+        mm_por_px = ((tamano_pixel_mm * distancia_camara_plano_mm) / focal_mm) * FACTOR_CORRECION_MM
     else:
         mm_por_px = mm_per_px
 

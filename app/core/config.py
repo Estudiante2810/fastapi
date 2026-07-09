@@ -51,9 +51,10 @@ COLORS_LABEL = {
 offsets_label = {'C': (-80, -30), 'M': (15, -30), 'Y': (-80, 40), 'K': (15, 40)}
 
 # Parámetros ópticos
-distancia_camara_plano_mm = 110
-focal_mm = 4.0
-sensor_width_mm = 5.6
+distancia_camara_plano_mm = 100
+focal_mm = 4.4
+sensor_width_mm = 5.37
+FACTOR_CORRECION_MM = 0.934
 
 # Sharpening
 APPLY_SHARPENING    = False
@@ -96,7 +97,7 @@ def calculate_mm_per_pixel(
         # Usar parámetro proporcionado o default para evitar errores
         dist = camera_distance_mm if camera_distance_mm is not None else distancia_camara_plano_mm
         tamano_pixel_mm = sensor_width_mm / image_width_px
-        return (tamano_pixel_mm * dist) / focal_mm
+        return ((tamano_pixel_mm * dist) / focal_mm) * FACTOR_CORRECION_MM 
     
     elif method == "mark_size":
         if not mark_size_mm or not mark_size_px:
