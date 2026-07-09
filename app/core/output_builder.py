@@ -11,7 +11,7 @@ from app.core.config import calculate_mm_per_pixel
 from app.core.config import (
     CMY_CROP_RANGES, COLORS_LABEL, offsets_label,
     distancia_camara_plano_mm, focal_mm, sensor_width_mm,
-    MARK_DIAMETER_PX,
+    MARK_DIAMETER_PX, FACTOR_CORRECCION_MM
 )
 
 
