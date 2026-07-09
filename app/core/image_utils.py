@@ -7,6 +7,7 @@ generación de plantilla y template matching multi-escala.
 
 import cv2
 import numpy as np
+from app.core.config import RING_RADIUS_PX
 
 
 def sharpen_image(bgr_img: np.ndarray, strength: float = 1.0) -> np.ndarray:
@@ -37,7 +38,7 @@ def preprocess_image(bgr_img: np.ndarray) -> np.ndarray:
 
 def create_crosshair_template(
     size: int = 101,
-    ring_radius: int = 40,
+    ring_radius: int = RING_RADIUS_PX,
     ring_thickness: int = 8,
     cross_thickness: int = 10,
     cross_length: int = 90,

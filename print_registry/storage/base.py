@@ -5,32 +5,31 @@ Implementa esta clase para agregar cualquier nuevo backend (Firebase, S3, etc.)
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 import uuid
 import json
 import os
 
-
 @dataclass
 class ColorResult:
     """Resultado de detección de un color en la imagen."""
-    name: str                          # Nombre del color (ej: "Cyan", "PANTONE 485")
-    coordinates: dict[str, float]      # {"x": 120, "y": 340, "width": 50, "height": 30}
-    confidence: float = 1.0            # Confianza de detección (0.0 - 1.0)
-    hex_value: str | None = None       # Color hex opcional (ej: "#00AEEF")
-    extra: dict[str, Any] = field(default_factory=dict)  # Metadatos adicionales
+    name: str
+    coordinates: dict[str, float]
+    confidence: float = 1.0
+    hex_value: str | None = None
+    extra: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class AnalysisRecord:
     """Registro completo de un análisis de imprenta."""
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     image_filename: str = ""
-    image_path: str = ""               # Ruta local o URL remota
+    image_path: str = ""
     colors: list[ColorResult] = field(default_factory=list)
-    metadata: dict[str, Any] = field(default_factory=dict)  # Info extra (cliente, trabajo, etc.)
+    metadata: dict[str, Any] = field(default_factory=dict)
 
 
 class StorageBackend(ABC):

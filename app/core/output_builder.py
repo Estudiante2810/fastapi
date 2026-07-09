@@ -7,10 +7,11 @@ Generación de imágenes de salida: máscaras, resultado anotado y panel de cál
 import os
 import cv2
 import numpy as np
-
+from app.core.config import calculate_mm_per_pixel
 from app.core.config import (
     CMY_CROP_RANGES, COLORS_LABEL, offsets_label,
-    distancia_camara_plano_mm, focal_mm, sensor_width_mm, FACTOR_CORRECION_MM
+    distancia_camara_plano_mm, focal_mm, sensor_width_mm,
+    MARK_DIAMETER_PX,
 )
 
 
@@ -151,8 +152,20 @@ def build_calc_panel(
     
     # Si no se pasó mm_per_px, calcular con el método por defecto
     if mm_per_px is None:
-        tamano_pixel_mm = sensor_width_mm / image_width_px
-        mm_por_px = ((tamano_pixel_mm * distancia_camara_plano_mm) / focal_mm) * FACTOR_CORRECION_MM
+        if calibration_method == 'mark_size' and mark_size_mm and k_marks:
+            mark_size_px = k_marks[0][3] * MARK_DIAMETER_PX   # antes: TEMPLATE_SIZE
+            mm_por_px = calculate_mm_per_pixel(
+                method='mark_size',
+                image_width_px=image_width_px,
+                mark_size_mm=mark_size_mm,
+                mark_size_px=mark_size_px,
+            )
+        else:
+            mm_por_px = calculate_mm_per_pixel(
+                method='camera_distance',
+                image_width_px=image_width_px,
+                camera_distance_mm=camera_distance_mm,
+            )
     else:
         mm_por_px = mm_per_px
 
