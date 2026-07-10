@@ -6,7 +6,7 @@ Modelos Pydantic para request/response de la API de detección CMYK.
 
 from pydantic import BaseModel, Field
 from enum import Enum
-from typing import Optional
+from typing import Optional, Dict
 
 
 class CalibrationMethod(str, Enum):
@@ -36,6 +36,8 @@ class ChannelResult(BaseModel):
 
 
 class DetectionResult(BaseModel):
+    id: str = ""
+    mm_per_px: float | None = None
     filename: str
     channels_detected: int = Field(..., description="Número de canales detectados (0–4)")
     C: Optional[ChannelResult] = None
@@ -50,3 +52,10 @@ class DetectionResult(BaseModel):
 
 class ErrorResponse(BaseModel):
     detail: str
+
+class AdjustPosition(BaseModel):
+    x: int
+    y: int
+
+class AdjustRequest(BaseModel):
+    positions: Dict[str, AdjustPosition]  # claves posibles: "C", "M", "Y", "K"

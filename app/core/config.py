@@ -100,7 +100,7 @@ def calculate_mm_per_pixel(
         dist = camera_distance_mm if camera_distance_mm is not None else distancia_camara_plano_mm
         tamano_pixel_mm = sensor_width_mm / image_width_px
         # incluimos factor de correccion de mm para distancia
-        return ((tamano_pixel_mm * dist) / focal_mm) * FACTOR_CORRECION_MM 
+        return ((tamano_pixel_mm * dist) / focal_mm) * FACTOR_CORRECION_MM
     
     elif method == "mark_size":
         if not mark_size_mm or not mark_size_px:

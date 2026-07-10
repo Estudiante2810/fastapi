@@ -77,7 +77,7 @@
             margin-bottom: 15px;
         }
 
-        canvas {
+        #canvas {
             display: none;
         }
 
@@ -311,6 +311,21 @@
         .lightbox-close:hover {
             color: #ccc;
         }
+
+
+    .channel-btn {
+    flex: none; min-width: 40px; padding: 6px 12px;
+    border: 2px solid transparent; border-radius: 6px;
+    font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.2s;
+    }
+    .channel-btn[data-channel="C"] { border-color: cyan; color: cyan; background: transparent; }
+    .channel-btn[data-channel="M"] { border-color: magenta; color: magenta; background: transparent; }
+    .channel-btn[data-channel="Y"] { border-color: gold; color: #999; background: transparent; }
+    .channel-btn[data-channel="K"] { border-color: #888; color: #888; background: transparent; }
+    .channel-btn.active[data-channel="C"] { background: cyan; color: #000; }
+    .channel-btn.active[data-channel="M"] { background: magenta; color: #fff; }
+    .channel-btn.active[data-channel="Y"] { background: gold; color: #000; }
+    .channel-btn.active[data-channel="K"] { background: #555; color: #fff; }
     </style>
 </head>
 <body>
@@ -361,7 +376,13 @@
 
         <div class="results" id="results" style="display: none;">
             <h3>Resultados del Análisis</h3>
+
             <div id="resultsGallery" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 15px;"></div>
+
+            <div style="margin-top: 15px; text-align: center;">
+                <button class="btn-primary" id="adjustBtn">Ajustar posiciones manualmente</button>
+            </div>
+
             <div id="resultsContent"></div>
         </div>
         </div>
@@ -385,6 +406,34 @@
                 <button class="btn-secondary" id="backToListBtn" style="margin-bottom: 15px;">← Volver a la lista</button>
                 <img id="historyDetailImage" style="width: 100%; border-radius: 10px; margin-bottom: 15px;" alt="Imagen del análisis">
                 <div id="historyDetailContent"></div>
+            </div>
+        </div>
+        <div id="adjustView" style="display: none;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <h2>Ajustar posiciones de registros</h2>
+                <button class="btn-secondary" id="cancelAdjustBtn">← Cancelar</button>
+            </div>
+            <div class="info-box">
+                Arrastre los marcadores de color para ajustar la posición de cada registro.
+                <br>C: <span style="color: cyan;">●</span> | M: <span style="color: magenta;">●</span> | Y: <span style="color: yellow;">●</span> | K: <span style="color: gray;">●</span>
+            </div>
+            <div id="channelSelector" style="display: flex; gap: 8px; margin-bottom: 10px; justify-content: center; align-items: center; flex-wrap: wrap;">
+                <button class="channel-btn active" data-channel="C">C</button>
+                <button class="channel-btn" data-channel="M">M</button>
+                <button class="channel-btn" data-channel="Y">Y</button>
+                <button class="channel-btn" data-channel="K">K</button>
+                <span style="width: 1px; height: 24px; background: #ddd; margin: 0 8px;"></span>
+                <button class="btn-secondary" id="decreaseSizeBtn" style="flex: none; min-width: 28px; padding: 2px 6px;">−</button>
+                <span id="markerSizeDisplay" style="font-size: 13px; font-weight: 600; min-width: 24px; text-align: center;">8</span>
+                <button class="btn-secondary" id="increaseSizeBtn" style="flex: none; min-width: 28px; padding: 2px 6px;">+</button>
+            </div>
+            <div style="position: relative; margin-bottom: 15px;">
+                <canvas id="adjustCanvas" style="width: 100%; border-radius: 10px; cursor: crosshair;"></canvas>
+            </div>
+            <div class="controls" style="justify-content: center;">
+                <button class="btn-primary" id="saveAdjustBtn">Guardar posiciones</button>
+                <button class="btn-secondary" id="restoreOriginalBtn">Restaurar originales</button>
+                <button class="btn-secondary" id="cancelAdjustBtn2">Cancelar</button>
             </div>
         </div>
     </div>
@@ -411,10 +460,33 @@
         const results = document.getElementById('results');
         const resultsContent = document.getElementById('resultsContent');
         const cameraError = document.getElementById('cameraError');
+        document.getElementById('adjustBtn').addEventListener('click', showAdjustView);
+        const adjustView = document.getElementById('adjustView');
+        const adjustCanvas = document.getElementById('adjustCanvas');
+        const saveAdjustBtn = document.getElementById('saveAdjustBtn');
+        const cancelAdjustBtn = document.getElementById('cancelAdjustBtn');
+        const cancelAdjustBtn2 = document.getElementById('cancelAdjustBtn2');
+        const restoreOriginalBtn = document.getElementById('restoreOriginalBtn');
 
         let stream = null;
         let isCameraActive = false;
         let capturedImageData = null;
+
+        let currentAnalysisId = null;
+        let currentMmPerPx = null;
+        let currentPositions = {};
+        let originalPositions = {};
+
+        let currentRoiMargin = 300;
+        let currentOriginalFileName = '';
+
+        let dragChannel = null;
+        let dragOffsetX = 0, dragOffsetY = 0;
+        let roiOffsetX = 0, roiOffsetY = 0; // offset del ROI en imagen completa
+
+        let selectedChannel = 'C';
+        let currentMarkerRadius = 8;
+        let isDragging = false;
 
         // Inicializar cámara
         async function initCamera() {
@@ -522,7 +594,7 @@
 
                 // Enviar al backend con camera_distance_mm=25 y todos los canales
                 const url = new URL('/api/v1/detection/analyze', window.location.origin);
-                url.searchParams.append('camera_distance_mm', '25');
+                url.searchParams.append('camera_distance_mm', '100');
                 url.searchParams.append('channels', 'C');
                 url.searchParams.append('channels', 'M');
                 url.searchParams.append('channels', 'Y');
@@ -540,6 +612,22 @@
 
                 const data = await response.json();
                 displayResults(data);
+                currentOriginalFilename = data.filename || 'capture.jpg';
+
+                // Busca el id de la imagen analizada y inicializa las posiciones actuales y cambiadas a las posiciones incluidas en los canales de datos originales.
+                currentAnalysisId = data.id;
+                currentMmPerPx = data.mm_per_px;
+                currentOriginalFilename = data.filename || '';
+                originalPositions = {};
+                currentPositions = {};
+                ['C', 'M', 'Y', 'K'].forEach(ch => {
+                    if (data[ch]?.detected && data[ch]?.mark) {
+                        originalPositions[ch] = { x: data[ch].mark.x, y: data[ch].mark.y };
+                        currentPositions[ch] = { ...originalPositions[ch] };
+                    }
+                });
+
+
                 success.classList.add('show');
                 success.textContent = '✓ Análisis completado exitosamente';
             } catch (err) {
@@ -630,6 +718,49 @@
                     resultsContent.appendChild(div);
                 }
             });
+
+            if (data.id && currentMmPerPx) {
+                const distDiv = document.createElement('div');
+                distDiv.className = 'channel-result';
+                distDiv.style.borderLeftColor = '#4dabf7';
+                
+                const positions = {};
+                ['C', 'M', 'Y', 'K'].forEach(ch => {
+                    if (data[ch]?.detected && data[ch]?.mark) {
+                        positions[ch] = data[ch].mark;
+                    }
+                });
+                
+                let distHtml = '<div class="channel-name">Distancias recalculadas</div><div class="channel-details">';
+                
+                if (positions['K']) {
+                    ['C', 'M', 'Y'].forEach(ch => {
+                        if (positions[ch]) {
+                            const dx = positions[ch].x - positions['K'].x;
+                            const dy = positions[ch].y - positions['K'].y;
+                            const dist = Math.hypot(dx, dy);
+                            const dx_mm = dx * currentMmPerPx;
+                            const dy_mm = dy * currentMmPerPx;
+                            const dist_mm = dist * currentMmPerPx;
+                            distHtml += `<div>${ch}-K: Δx=${dx_mm.toFixed(3)} mm  Δy=${dy_mm.toFixed(3)} mm  dist=${dist_mm.toFixed(3)} mm</div>`;
+                        }
+                    });
+                }
+                
+                // Distancias por pares
+                const chs = Object.keys(positions);
+                for (let i = 0; i < chs.length; i++) {
+                    for (let j = i + 1; j < chs.length; j++) {
+                        const dx = positions[chs[i]].x - positions[chs[j]].x;
+                        const dy = positions[chs[i]].y - positions[chs[j]].y;
+                        const dist = Math.hypot(dx, dy) * currentMmPerPx;
+                        distHtml += `<div>${chs[i]}-${chs[j]}: ${dist.toFixed(3)} mm</div>`;
+                    }
+                }
+                
+                distDiv.innerHTML = distHtml + '</div>';
+                resultsContent.appendChild(distDiv);
+            }
 
             results.style.display = 'block';
         }
@@ -785,6 +916,34 @@
             document.getElementById('fileInput').click();
         });
 
+        saveAdjustBtn.addEventListener('click', saveAdjustedPositions);
+
+        cancelAdjustBtn.addEventListener('click', () => {
+            currentPositions = {};
+            Object.keys(originalPositions).forEach(ch => {
+                currentPositions[ch] = { ...originalPositions[ch] };
+            });
+            adjustView.style.display = 'none';
+            mainView.style.display = 'block';
+        });
+
+        cancelAdjustBtn2.addEventListener('click', () => {
+            currentPositions = {};
+            Object.keys(originalPositions).forEach(ch => {
+                currentPositions[ch] = { ...originalPositions[ch] };
+            });
+            adjustView.style.display = 'none';
+            mainView.style.display = 'block';
+        });
+
+        restoreOriginalBtn.addEventListener('click', () => {
+            currentPositions = {};
+            Object.keys(originalPositions).forEach(ch => {
+                currentPositions[ch] = { ...originalPositions[ch] };
+            });
+            redrawAdjustCanvas();
+        });
+
         document.getElementById('fileInput').addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
@@ -808,6 +967,240 @@
             };
             reader.readAsDataURL(file);
         });
+
+        function showAdjustView() {
+            // Ocultar mainView, mostrar adjustView
+            mainView.style.display = 'none';
+            adjustView.style.display = 'block';
+
+            // const canvas = document.getElementById('adjustCanvas');
+
+            selectedChannel = 'C';
+                    document.querySelectorAll('.channel-btn').forEach(b =>
+                b.classList.toggle('active', b.dataset.channel === selectedChannel)
+            );
+
+            const ctx = canvas.getContext('2d');
+
+            // Cargar imagen original desde capturedImageData
+            const img = new Image();
+            img.onload = function() {
+                // Calcular ROI alrededor de K
+                const margin = 300; // usar roi_margin o default
+                const baseK = originalPositions['K'] || currentPositions['K'];
+                const rx1 = Math.max(baseK.x - currentRoiMargin, 0);
+                const ry1 = Math.max(baseK.y - currentRoiMargin, 0);
+                const rx2 = Math.min(baseK.x + currentRoiMargin, img.width);
+                const ry2 = Math.min(baseK.y + currentRoiMargin, img.height);
+
+
+                roiOffsetX = rx1;
+                roiOffsetY = ry1;
+
+                adjustCanvas.width = rx2 - rx1;
+                adjustCanvas.height = ry2 - ry1;
+
+                // Dibujar ROI recortado
+                ctx.drawImage(img, rx1, ry1, adjustCanvas.width, adjustCanvas.height, 0, 0, adjustCanvas.width, adjustCanvas.height);
+
+                // Dibujar marcadores para cada canal
+                drawMarkers(ctx, currentPositions, roiOffsetX, roiOffsetY);
+            };
+            img.src = capturedImageData;
+        }
+
+
+
+        function drawMarkers(ctx, positions, roiOx, roiOy) {
+            //ctx.clearRect(0, 0, adjustCanvas.width, adjustCanvas.height);
+            const colors = {
+                'C': 'cyan',
+                'M': 'magenta',
+                'Y': 'yellow',
+                'K': 'gray'
+            };
+            const labels = ['C', 'M', 'Y', 'K'];
+            
+            // fondo transparente, dibujar círculos
+            labels.forEach(ch => {
+                if (!positions[ch]) return;
+                const lx = positions[ch].x - roiOx;
+                const ly = positions[ch].y - roiOy;
+                
+                ctx.beginPath();
+                ctx.arc(lx, ly, currentMarkerRadius, 0, 2 * Math.PI);
+                ctx.fillStyle = colors[ch];
+                ctx.fill();
+                ctx.strokeStyle = 'white';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // crosshair
+                ctx.beginPath();
+                ctx.moveTo(lx - 15, ly);
+                ctx.lineTo(lx + 15, ly);
+                ctx.moveTo(lx, ly - 15);
+                ctx.lineTo(lx, ly + 15);
+                ctx.strokeStyle = colors[ch];
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                // label
+                ctx.fillStyle = 'white';
+                ctx.font = 'bold 12px sans-serif';
+                ctx.fillText(ch, lx + 12, ly - 12);
+            });
+        }
+
+                // ============ DRAG ============
+        function getCanvasPos(canvas, e) {
+            const rect = canvas.getBoundingClientRect();
+            const scaleX = canvas.width / rect.width;
+            const scaleY = canvas.height / rect.height;
+            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+            return {
+                x: (clientX - rect.left) * scaleX + roiOffsetX,
+                y: (clientY - rect.top) * scaleY + roiOffsetY,
+            };
+        }
+
+        function redrawAdjustCanvas() {
+            const ctx = adjustCanvas.getContext('2d');
+            const img = new Image();
+            img.onload = function() {
+                const margin = currentRoiMargin;
+                const baseK = originalPositions['K'] || currentPositions['K'];
+                const rx1 = Math.max(baseK.x - currentRoiMargin, 0);
+                const ry1 = Math.max(baseK.y - currentRoiMargin, 0);
+                const rx2 = Math.min(baseK.x + currentRoiMargin, img.width);
+                const ry2 = Math.min(baseK.y + currentRoiMargin, img.height);
+
+                ctx.clearRect(0, 0, adjustCanvas.width, adjustCanvas.height);
+                ctx.drawImage(img, rx1, ry1, adjustCanvas.width, adjustCanvas.height, 0, 0, adjustCanvas.width, adjustCanvas.height);
+                drawMarkers(ctx, currentPositions, rx1, ry1);
+            };
+            img.src = capturedImageData;
+        }
+
+        document.querySelectorAll('.channel-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.channel-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                selectedChannel = btn.dataset.channel;
+            });
+        });
+
+        document.getElementById('decreaseSizeBtn').addEventListener('click', () => {
+            currentMarkerRadius = Math.max(4, currentMarkerRadius - 2);
+            document.getElementById('markerSizeDisplay').textContent = currentMarkerRadius;
+            redrawAdjustCanvas();
+        });
+
+        document.getElementById('increaseSizeBtn').addEventListener('click', () => {
+            currentMarkerRadius = Math.min(30, currentMarkerRadius + 2);
+            document.getElementById('markerSizeDisplay').textContent = currentMarkerRadius;
+            redrawAdjustCanvas();
+        });
+
+        // Mouse events
+        adjustCanvas.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            const rect = adjustCanvas.getBoundingClientRect();
+            const scaleX = adjustCanvas.width / rect.width;
+            const scaleY = adjustCanvas.height / rect.height;
+            const worldX = Math.round((e.clientX - rect.left) * scaleX + roiOffsetX);
+            const worldY = Math.round((e.clientY - rect.top) * scaleY + roiOffsetY);
+            currentPositions[selectedChannel] = { x: worldX, y: worldY };
+            redrawAdjustCanvas();
+        });
+
+
+
+        adjustCanvas.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            const rect = adjustCanvas.getBoundingClientRect();
+            const scaleX = adjustCanvas.width / rect.width;
+            const scaleY = adjustCanvas.height / rect.height;
+            const worldX = Math.round((e.clientX - rect.left) * scaleX + roiOffsetX);
+            const worldY = Math.round((e.clientY - rect.top) * scaleY + roiOffsetY);
+            currentPositions[selectedChannel] = { x: worldX, y: worldY };
+            redrawAdjustCanvas();
+        });
+
+        adjustCanvas.addEventListener('mouseup', () => { isDragging = false; });
+
+        adjustCanvas.addEventListener('mouseleave', () => { isDragging = false; });
+
+
+        // Touch events
+        adjustCanvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            isDragging = true;
+            const touch = e.touches[0];
+            const rect = adjustCanvas.getBoundingClientRect();
+            const scaleX = adjustCanvas.width / rect.width;
+            const scaleY = adjustCanvas.height / rect.height;
+            const worldX = Math.round((touch.clientX - rect.left) * scaleX + roiOffsetX);
+            const worldY = Math.round((touch.clientY - rect.top) * scaleY + roiOffsetY);
+            currentPositions[selectedChannel] = { x: worldX, y: worldY };
+            redrawAdjustCanvas();
+        });
+
+        adjustCanvas.addEventListener('touchmove', (e) => {
+            e.preventDefault();
+            if (!isDragging) return;
+            const touch = e.touches[0];
+            const rect = adjustCanvas.getBoundingClientRect();
+            const scaleX = adjustCanvas.width / rect.width;
+            const scaleY = adjustCanvas.height / rect.height;
+            const worldX = Math.round((touch.clientX - rect.left) * scaleX + roiOffsetX);
+            const worldY = Math.round((touch.clientY - rect.top) * scaleY + roiOffsetY);
+            currentPositions[selectedChannel] = { x: worldX, y: worldY };
+            redrawAdjustCanvas();
+        });
+
+        adjustCanvas.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            isDragging = false;
+        });
+
+        async function saveAdjustedPositions() {
+            try {
+                loading.style.display = 'block';
+                
+                const response = await fetch(
+                    `/api/v1/detection/${currentAnalysisId}/adjust`,
+                    {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ positions: currentPositions })
+                    }
+                );
+                
+                if (!response.ok) throw new Error('Error al ajustar posiciones');
+                
+                const data = await response.json();
+                
+                // Volver a la vista de resultados con datos actualizados
+                adjustView.style.display = 'none';
+                mainView.style.display = 'block';
+                displayResults(data);
+                
+                success.classList.add('show');
+                success.textContent = '✓ Posiciones ajustadas y distancias recalculadas';
+            } catch (err) {
+                error.classList.add('show');
+                error.textContent = `Error: ${err.message}`;
+            } finally {
+                loading.style.display = 'none';
+            }
+        }
+
+        // Eventos mouse/touch para arrastrar
+        // mousedown: detectar canal más cercano (dist < 20px), iniciar drag
+        // mousemove: actualizar posición del canal en currentPositions, redibujar
+        // mouseup: finalizar drag
 
         // ============ LIGHTBOX ============
         const lightboxOverlay = document.getElementById('lightboxOverlay');
@@ -843,3 +1236,4 @@
     </script>
 </body>
 </html>
+        

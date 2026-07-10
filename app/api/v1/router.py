@@ -19,10 +19,10 @@ from app.core.image_utils import (
 )
 from app.core.detection import procesar_imagen_completa
 from app.core.output_builder import save_all_outputs
-from app.schemas.detection import DetectionResult, ChannelResult, MarkPosition
+from app.schemas.detection import DetectionResult, ChannelResult, MarkPosition, AdjustRequest
 from app.schemas.calibration import CalibrationMethod, CMYKChannel
 
-from print_registry.storage.base import ColorResult, AnalysisRecord, StorageBackend
+from print_registry.storage.base import ColorResult
 from print_registry.AnalysisRecord.local_storage import LocalStorage
 
 router = APIRouter(prefix="/detection", tags=["detection"])
@@ -164,7 +164,7 @@ async def analyze_image(
         for ch in ["C", "M", "Y", "K"]
         if cmyk_marks.get(ch)
     ]
-    storage.save(
+    record = storage.save(
         image_bytes=raw,
         filename=filename,
         results=color_results,
@@ -173,14 +173,19 @@ async def analyze_image(
             "roi_margin": roi_margin,
             "calibration_method": calibration_method.value,
             "mm_per_px": mm_per_px,
+            "camera_distance_mm": camera_distance_mm,
+            "mark_size_mm": mark_size_mm,
         },
     )
+    id = record.id
     
     channels_detected = sum(
         1 for ch in channels_list if cmyk_marks.get(ch)
     )
 
     return DetectionResult(
+        id=record.id,
+        mm_per_px = mm_per_px,
         filename=filename,
         channels_detected=channels_detected,
         C=_build_channel_result('C', cmyk_marks, diag_por_canal) if 'C' in channels_list else None,
@@ -300,3 +305,109 @@ async def get_history_image(record_id: str, filename: str):
         raise HTTPException(status_code=404, detail=f"Archivo no encontrado: {filename}")
 
     return FileResponse(file_path, media_type="image/jpeg", filename=safe_name)
+
+
+
+@router.post(
+    "/{record_id}/adjust",
+    summary="Ajusta manualmente las posiciones de los registros y recalcula distancias",
+)
+async def adjust_positions(record_id: str, body: AdjustRequest):
+    import cv2
+    import numpy as np
+    from app.core.output_builder import build_result_image, build_calc_panel
+
+    record = storage.get(record_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail=f"Registro no encontrado: {record_id}")
+
+    metadata = record.metadata or {}
+    mm_per_px = metadata.get("mm_per_px")
+    roi_margin = metadata.get("roi_margin", 230)
+    calibration_method = metadata.get("calibration_method", "camera_distance")
+    camera_distance_mm = metadata.get("camera_distance_mm")
+    mark_size_mm = metadata.get("mark_size_mm")
+
+    if mm_per_px is None:
+        raise HTTPException(status_code=422, detail="mm_per_px no disponible en el registro original")
+
+    # Cargar imagen original
+    img_folder = record.image_path
+    if not img_folder or not os.path.isdir(img_folder):
+        raise HTTPException(status_code=404, detail="Carpeta de imagen original no encontrada")
+    
+    img_path = os.path.join(img_folder, record.image_filename)
+    if not os.path.isfile(img_path):
+        raise HTTPException(status_code=404, detail="Imagen original no encontrada")
+    
+    img_bgr = cv2.imread(img_path)
+    if img_bgr is None:
+        raise HTTPException(status_code=500, detail="No se pudo decodificar la imagen original")
+
+    # Reconstruir cmyk_marks con posiciones ajustadas
+    cmyk_marks = {}
+    for ch in ['C', 'M', 'Y', 'K']:
+        if ch in body.positions:
+            pos = body.positions[ch]
+            # Buscar score y scale original del color correspondiente
+            orig_score = 1.0
+            orig_scale = 1.0
+            for c in record.colors:
+                if c.name == ch:
+                    orig_score = c.confidence
+                    orig_scale = c.extra.get("scale", 1.0)
+                    break
+            cmyk_marks[ch] = [(pos.x, pos.y, orig_score, orig_scale)]
+
+    # Construir k_marks desde la posición K ajustada
+    k_marks = []
+    if 'K' in cmyk_marks:
+        kx, ky, ks, kscale = cmyk_marks['K'][0]
+        k_marks = [(kx, ky, ks, kscale)]
+    else:
+        raise HTTPException(status_code=422, detail="Se requiere posición K")
+
+    # Generar nuevas imágenes
+    result_img = build_result_image(img_bgr, cmyk_marks, k_marks, record.image_filename, roi_margin)
+    calc_img = build_calc_panel(
+        img_bgr, cmyk_marks, k_marks, record.image_filename,
+        calibration_method=calibration_method,
+        mark_size_mm=mark_size_mm,
+        camera_distance_mm=camera_distance_mm,
+        mm_per_px=mm_per_px,
+    )
+
+    # Guardar en resultados/ con nombre basado en record_id
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    adj_result_path = os.path.join(OUTPUT_DIR, f"{record_id}_ajustado_resultado.jpg")
+    adj_calc_path = os.path.join(OUTPUT_DIR, f"{record_id}_ajustado_calculos_mm.jpg")
+    cv2.imwrite(adj_result_path, result_img)
+    cv2.imwrite(adj_calc_path, calc_img)
+
+    output_files = {
+        "resultado": adj_result_path,
+        "calculos_mm": adj_calc_path,
+    }
+
+    # Construir ChannelResults con confianza 1.0 (ajuste manual)
+    def make_ch(ch):
+        if ch not in body.positions:
+            return None
+        p = body.positions[ch]
+        return ChannelResult(
+            detected=True,
+            mark=MarkPosition(x=p.x, y=p.y, score=1.0, scale=1.0),
+            pixel_count=0,
+        )
+
+    return DetectionResult(
+        id=record_id,
+        mm_per_px=mm_per_px,
+        filename=record.image_filename,
+        channels_detected=len([ch for ch in ['C', 'M', 'Y', 'K'] if ch in body.positions and ch != 'K']),
+        C=make_ch('C'),
+        M=make_ch('M'),
+        Y=make_ch('Y'),
+        K=make_ch('K'),
+        output_files=output_files,
+    )
