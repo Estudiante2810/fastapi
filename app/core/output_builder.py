@@ -149,11 +149,10 @@ def build_calc_panel(
     Genera el panel de cálculos: desalineamientos respecto a K y distancias en mm.
     """
     image_width_px = img_bgr.shape[1]
-    
-    # Si no se pasó mm_per_px, calcular con el método por defecto
+
     if mm_per_px is None:
         if calibration_method == 'mark_size' and mark_size_mm and k_marks:
-            mark_size_px = k_marks[0][3] * MARK_DIAMETER_PX   # antes: TEMPLATE_SIZE
+            mark_size_px = k_marks[0][3] * MARK_DIAMETER_PX
             mm_por_px = calculate_mm_per_pixel(
                 method='mark_size',
                 image_width_px=image_width_px,
@@ -175,7 +174,6 @@ def build_calc_panel(
         if cmyk_marks.get(ch)
     }
 
-    # Usar camera_distance_mm si se proporciona, sino usar el default
     if calibration_method == 'mark_size' and mark_size_mm:
         calibration_text = f'Calibrado con marca de {mark_size_mm} mm'
     else:
@@ -184,28 +182,26 @@ def build_calc_panel(
             f'Dist. camara-plano: {dist} mm  |  Focal: {focal_mm} mm'
         )
 
+    # --- ÚNICA fuente de verdad para los cálculos vs K ---
+    distancias = calcular_distancias_a_k(cmyk_marks, k_marks, mm_por_px)
+
     lines = [
         f'Archivo: {filename}',
         f'Factor optico: 1 px = {mm_por_px:.4f} mm  |  {calibration_text}',
         '',
         '--- Desalineamiento respecto a K ---',
     ]
+    for ch in ['C', 'M', 'Y']:
+        d = distancias.get(ch, {"detected": False})
+        if d["detected"]:
+            lines.append(
+                f'  {ch}-K:  Dx={d["dx_mm"]:+.3f} mm   Dy={d["dy_mm"]:+.3f} mm   '
+                f'dist={d["dist_mm"]:.3f} mm  ({d["dist_px"]:.1f} px)'
+            )
+        else:
+            lines.append(f'  {ch}: no detectado')
 
-    if k_marks:
-        kx, ky = k_marks[0][0], k_marks[0][1]
-        for ch in ['C', 'M', 'Y']:
-            if positions.get(ch):
-                dx_px = positions[ch][0] - kx
-                dy_px = positions[ch][1] - ky
-                dp    = np.hypot(dx_px, dy_px)
-                dx_mm = dx_px * mm_por_px
-                dy_mm = dy_px * mm_por_px
-                dm    = dp * mm_por_px
-                lines.append(
-                    f'  {ch}-K:  Dx={dx_mm:+.3f} mm   Dy={dy_mm:+.3f} mm   dist={dm:.3f} mm  ({dp:.1f} px)'
-                )
-            else:
-                lines.append(f'  {ch}: no detectado')
+    # (El bloque viejo "if k_marks: kx, ky = ..." queda ELIMINADO por completo)
 
     lines += ['', '--- Distancias entre todos los pares ---']
     pnames = list(positions.keys())
@@ -237,6 +233,48 @@ def build_calc_panel(
 
     return panel
 
+def calcular_distancias_a_k(
+    cmyk_marks: dict,
+    k_marks: list,
+    mm_por_px: float,
+) -> dict:
+    """
+    Calcula el desalineamiento (Dx, Dy, distancia) de cada canal C/M/Y
+    respecto a la marca K, en píxeles y en mm.
+    Retorna un dict serializable, ej:
+    {
+        "C": {"detected": True, "dx_mm": 0.12, "dy_mm": -0.05, "dist_mm": 0.13, "dist_px": 4.2},
+        "M": {"detected": False},
+        ...
+    }
+    """
+    positions = {
+        ch: (cmyk_marks[ch][0][0], cmyk_marks[ch][0][1])
+        for ch in ['C', 'M', 'Y', 'K']
+        if cmyk_marks.get(ch)
+    }
+
+    resultado = {}
+    if not k_marks:
+        return resultado
+
+    kx, ky = k_marks[0][0], k_marks[0][1]
+    for ch in ['C', 'M', 'Y']:
+        if positions.get(ch):
+            dx_px = positions[ch][0] - kx
+            dy_px = positions[ch][1] - ky
+            dp    = float(np.hypot(dx_px, dy_px))
+            resultado[ch] = {
+                "detected": True,
+                "dx_mm": round(float(dx_px * mm_por_px), 4),
+                "dy_mm": round(float(dy_px * mm_por_px), 4),
+                "dist_mm": round(float(dp * mm_por_px), 4),
+                "dist_px": round(dp, 2),
+            }
+        else:
+            resultado[ch] = {"detected": False}
+
+    return resultado
 
 def save_all_outputs(
     img_bgr: np.ndarray,

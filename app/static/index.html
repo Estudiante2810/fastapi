@@ -719,46 +719,42 @@
                 }
             });
 
-            if (data.id && currentMmPerPx) {
+            if (data.distances_to_k) {
                 const distDiv = document.createElement('div');
                 distDiv.className = 'channel-result';
                 distDiv.style.borderLeftColor = '#4dabf7';
-                
-                const positions = {};
-                ['C', 'M', 'Y', 'K'].forEach(ch => {
-                    if (data[ch]?.detected && data[ch]?.mark) {
-                        positions[ch] = data[ch].mark;
+
+                let rows = '';
+                ['C', 'M', 'Y'].forEach(ch => {
+                    const d = data.distances_to_k[ch];
+                    if (d && d.detected) {
+                        rows += `<tr>
+                            <td>${ch}-K</td>
+                            <td>${d.dx_mm.toFixed(3)}</td>
+                            <td>${d.dy_mm.toFixed(3)}</td>
+                            <td>${d.dist_mm.toFixed(3)}</td>
+                            <td>${d.dist_px.toFixed(1)}</td>
+                        </tr>`;
+                    } else {
+                        rows += `<tr><td>${ch}</td><td colspan="4">No detectado</td></tr>`;
                     }
                 });
-                
-                let distHtml = '<div class="channel-name">Distancias recalculadas</div><div class="channel-details">';
-                
-                if (positions['K']) {
-                    ['C', 'M', 'Y'].forEach(ch => {
-                        if (positions[ch]) {
-                            const dx = positions[ch].x - positions['K'].x;
-                            const dy = positions[ch].y - positions['K'].y;
-                            const dist = Math.hypot(dx, dy);
-                            const dx_mm = dx * currentMmPerPx;
-                            const dy_mm = dy * currentMmPerPx;
-                            const dist_mm = dist * currentMmPerPx;
-                            distHtml += `<div>${ch}-K: Δx=${dx_mm.toFixed(3)} mm  Δy=${dy_mm.toFixed(3)} mm  dist=${dist_mm.toFixed(3)} mm</div>`;
-                        }
-                    });
-                }
-                
-                // Distancias por pares
-                const chs = Object.keys(positions);
-                for (let i = 0; i < chs.length; i++) {
-                    for (let j = i + 1; j < chs.length; j++) {
-                        const dx = positions[chs[i]].x - positions[chs[j]].x;
-                        const dy = positions[chs[i]].y - positions[chs[j]].y;
-                        const dist = Math.hypot(dx, dy) * currentMmPerPx;
-                        distHtml += `<div>${chs[i]}-${chs[j]}: ${dist.toFixed(3)} mm</div>`;
-                    }
-                }
-                
-                distDiv.innerHTML = distHtml + '</div>';
+
+                distDiv.innerHTML = `
+                    <div class="channel-name">Distancias respecto a K</div>
+                    <table style="width:100%; border-collapse: collapse; font-size:13px; margin-top:8px;">
+                        <thead>
+                            <tr>
+                                <th style="text-align:left;">Canal</th>
+                                <th style="text-align:left;">Δx (mm)</th>
+                                <th style="text-align:left;">Δy (mm)</th>
+                                <th style="text-align:left;">Dist (mm)</th>
+                                <th style="text-align:left;">Dist (px)</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                `;
                 resultsContent.appendChild(distDiv);
             }
 

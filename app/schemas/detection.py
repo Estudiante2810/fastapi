@@ -49,6 +49,32 @@ class DetectionResult(BaseModel):
         description="Rutas a los archivos JPG generados",
     )
 
+class DistanceToK(BaseModel):
+    detected: bool
+    dx_mm: float | None = None
+    dy_mm: float | None = None
+    dist_mm: float | None = None
+    dist_px: float | None = None
+
+
+class DetectionResult(BaseModel):
+    id: str = ""
+    mm_per_px: float | None = None
+    filename: str
+    channels_detected: int = Field(..., description="Número de canales detectados (0–4)")
+    C: Optional[ChannelResult] = None
+    M: Optional[ChannelResult] = None
+    Y: Optional[ChannelResult] = None
+    K: Optional[ChannelResult] = None
+    distances_to_k: Dict[str, DistanceToK] = Field(
+        default_factory=dict,
+        description="Desalineamiento de cada canal (C, M, Y) respecto a K, en mm y px",
+    )
+    output_files: dict[str, str] = Field(
+        default_factory=dict,
+        description="Rutas a los archivos JPG generados",
+    )
+
 
 class ErrorResponse(BaseModel):
     detail: str

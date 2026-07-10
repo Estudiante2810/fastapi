@@ -18,9 +18,10 @@ from app.core.image_utils import (
     sharpen_image,
 )
 from app.core.detection import procesar_imagen_completa
-from app.core.output_builder import save_all_outputs
+from app.core.output_builder import save_all_outputs, calcular_distancias_a_k
 from app.schemas.detection import DetectionResult, ChannelResult, MarkPosition, AdjustRequest
 from app.schemas.calibration import CalibrationMethod, CMYKChannel
+
 
 from print_registry.storage.base import ColorResult
 from print_registry.AnalysisRecord.local_storage import LocalStorage
@@ -133,9 +134,12 @@ async def analyze_image(
             camera_distance_mm=camera_distance_mm, 
         )
 
+    
     # Filtrar canales solicitados
     channels_list = [ch.value for ch in channels]
-    
+
+    distances_to_k = calcular_distancias_a_k(cmyk_marks, k_marks, mm_per_px)
+
     # Guardar outputs opcionales
     output_files: dict[str, str] = {}
     if save_outputs:
@@ -183,6 +187,8 @@ async def analyze_image(
         1 for ch in channels_list if cmyk_marks.get(ch)
     )
 
+
+
     return DetectionResult(
         id=record.id,
         mm_per_px = mm_per_px,
@@ -192,6 +198,7 @@ async def analyze_image(
         M=_build_channel_result('M', cmyk_marks, diag_por_canal) if 'M' in channels_list else None,
         Y=_build_channel_result('Y', cmyk_marks, diag_por_canal) if 'Y' in channels_list else None,
         K=_build_channel_result('K', cmyk_marks, diag_por_canal),  # K siempre se incluye
+        distances_to_k=distances_to_k,
         output_files=output_files,
     )
 
@@ -377,6 +384,8 @@ async def adjust_positions(record_id: str, body: AdjustRequest):
         mm_per_px=mm_per_px,
     )
 
+    distances_to_k = calcular_distancias_a_k(cmyk_marks, k_marks, mm_per_px)
+
     # Guardar en resultados/ con nombre basado en record_id
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     adj_result_path = os.path.join(OUTPUT_DIR, f"{record_id}_ajustado_resultado.jpg")
@@ -409,5 +418,6 @@ async def adjust_positions(record_id: str, body: AdjustRequest):
         M=make_ch('M'),
         Y=make_ch('Y'),
         K=make_ch('K'),
+        distances_to_k=distances_to_k,
         output_files=output_files,
     )
