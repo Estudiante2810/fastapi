@@ -422,6 +422,10 @@
                 <button class="channel-btn" data-channel="M">M</button>
                 <button class="channel-btn" data-channel="Y">Y</button>
                 <button class="channel-btn" data-channel="K">K</button>
+                <label style="font-size: 13px; cursor: pointer; user-select: none; display: flex; align-items: center; gap: 4px;">
+                    <input type="checkbox" id="hideOthersCheck" checked>
+                    Ocultar otros
+                </label>
                 <span style="width: 1px; height: 24px; background: #ddd; margin: 0 8px;"></span>
                 <button class="btn-secondary" id="decreaseSizeBtn" style="flex: none; min-width: 28px; padding: 2px 6px;">−</button>
                 <span id="markerSizeDisplay" style="font-size: 13px; font-weight: 600; min-width: 24px; text-align: center;">8</span>
@@ -463,6 +467,10 @@
         document.getElementById('adjustBtn').addEventListener('click', showAdjustView);
         const adjustView = document.getElementById('adjustView');
         const adjustCanvas = document.getElementById('adjustCanvas');
+            document.getElementById('hideOthersCheck').addEventListener('change', (e) => {
+        hideOtherChannels = e.target.checked;
+        redrawAdjustCanvas();
+    });
         const saveAdjustBtn = document.getElementById('saveAdjustBtn');
         const cancelAdjustBtn = document.getElementById('cancelAdjustBtn');
         const cancelAdjustBtn2 = document.getElementById('cancelAdjustBtn2');
@@ -476,6 +484,7 @@
         let currentMmPerPx = null;
         let currentPositions = {};
         let originalPositions = {};
+        let hideOtherChannels = true;
 
         let currentRoiMargin = 300;
         let currentOriginalFileName = '';
@@ -1020,6 +1029,7 @@
             // fondo transparente, dibujar círculos
             labels.forEach(ch => {
                 if (!positions[ch]) return;
+                if (hideOtherChannels && ch !== selectedChannel) return;
                 const lx = positions[ch].x - roiOx;
                 const ly = positions[ch].y - roiOy;
                 
@@ -1088,7 +1098,7 @@
         });
 
         document.getElementById('decreaseSizeBtn').addEventListener('click', () => {
-            currentMarkerRadius = Math.max(4, currentMarkerRadius - 2);
+            currentMarkerRadius = Math.max(2, currentMarkerRadius - 2);
             document.getElementById('markerSizeDisplay').textContent = currentMarkerRadius;
             redrawAdjustCanvas();
         });
