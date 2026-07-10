@@ -261,8 +261,8 @@ def calcular_distancias_a_k(
     kx, ky = k_marks[0][0], k_marks[0][1]
     for ch in ['C', 'M', 'Y']:
         if positions.get(ch):
-            dx_px = positions[ch][0] - kx
-            dy_px = positions[ch][1] - ky
+            dx_px = -(positions[ch][0] - kx)
+            dy_px = -(positions[ch][1] - ky)
             dp    = float(np.hypot(dx_px, dy_px))
             resultado[ch] = {
                 "detected": True,
