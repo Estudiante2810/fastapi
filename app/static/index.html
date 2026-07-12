@@ -719,19 +719,18 @@
                 b.classList.toggle('active', b.dataset.channel === selectedChannel)
             );
 
-            const ctx = canvas.getContext('2d');
+            const ctx = adjustCanvas.getContext('2d');
 
             // Cargar imagen original desde capturedImageData
             const img = new Image();
             img.onload = function() {
                 // Calcular ROI alrededor de K
-                const margin = 300; // usar roi_margin o default
+                const margin = currentRoiMargin; // usar roi_margin o default
                 const baseK = originalPositions['K'] || currentPositions['K'];
                 const rx1 = Math.max(baseK.x - currentRoiMargin, 0);
                 const ry1 = Math.max(baseK.y - currentRoiMargin, 0);
                 const rx2 = Math.min(baseK.x + currentRoiMargin, img.width);
                 const ry2 = Math.min(baseK.y + currentRoiMargin, img.height);
-
 
                 roiOffsetX = rx1;
                 roiOffsetY = ry1;
@@ -739,11 +738,13 @@
                 adjustCanvas.width = rx2 - rx1;
                 adjustCanvas.height = ry2 - ry1;
 
+                ctx.clearRect(0, 0, adjustCanvas.width, adjustCanvas.height);
+
                 // Dibujar ROI recortado
                 ctx.drawImage(img, rx1, ry1, adjustCanvas.width, adjustCanvas.height, 0, 0, adjustCanvas.width, adjustCanvas.height);
 
                 // Dibujar marcadores para cada canal
-                drawMarkers(ctx, currentPositions, roiOffsetX, roiOffsetY);
+                drawMarkers(ctx, currentPositions, rx1, ry1);
             };
             img.src = capturedImageData;
         }
