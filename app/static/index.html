@@ -138,10 +138,15 @@
                 <br>C: <span style="color: cyan;">●</span> | M: <span style="color: magenta;">●</span> | Y: <span style="color: yellow;">●</span> | K: <span style="color: gray;">●</span>
             </div>
             <div id="channelSelector" style="display: flex; gap: 8px; margin-bottom: 10px; justify-content: center; align-items: center; flex-wrap: wrap;">
+                <div style="position: relative;">
+                    <button class="btn-secondary" id="addChannelBtn" style="flex: none; min-width: 28px; padding: 2px 6px; font-weight: 700;">+</button>
+                    <div id="addChannelDropdown" style="display: none; position: absolute; top: 100%; left: 0; background: white; border: 1px solid #ddd; border-radius: 6px; z-index: 10; min-width: 120px; box-shadow: 0 4px 12px rgba(0,0,0,0.15);"></div>
+                </div>
                 <button class="channel-btn active" data-channel="C">C</button>
                 <button class="channel-btn" data-channel="M">M</button>
                 <button class="channel-btn" data-channel="Y">Y</button>
                 <button class="channel-btn" data-channel="K">K</button>
+                <button class="btn-secondary" id="removeChannelBtn" style="flex: none; min-width: 28px; padding: 2px 6px; font-weight: 700;">−</button>
                 <label style="font-size: 13px; cursor: pointer; user-select: none; display: flex; align-items: center; gap: 4px;">
                     <input type="checkbox" id="hideOthersCheck" checked>
                     Ocultar otros
@@ -150,6 +155,13 @@
                 <button class="btn-secondary" id="decreaseSizeBtn" style="flex: none; min-width: 28px; padding: 2px 6px;">−</button>
                 <span id="markerSizeDisplay" style="font-size: 13px; font-weight: 600; min-width: 24px; text-align: center;">8</span>
                 <button class="btn-secondary" id="increaseSizeBtn" style="flex: none; min-width: 28px; padding: 2px 6px;">+</button>
+            </div>
+            <div style="display: flex; gap: 8px; justify-content: center; align-items: center; margin-bottom: 8px;">
+                <button class="btn-secondary" id="zoomOutBtn" style="flex: none; min-width: 28px; padding: 2px 6px;">−</button>
+                <span id="zoomLevelDisplay" style="font-size: 14px; font-weight: 700; min-width: 40px; text-align: center;">1.0x</span>
+                <button class="btn-secondary" id="zoomInBtn" style="flex: none; min-width: 28px; padding: 2px 6px;">+</button>
+                <span style="width:1px;height:24px;background:#ddd;margin:0 8px;"></span>
+                <button class="btn-secondary" id="fitViewBtn" style="flex: none; padding: 2px 12px;">Ajustar</button>
             </div>
             <div style="position: relative; margin-bottom: 15px;">
                 <canvas id="adjustCanvas" style="width: 100%; border-radius: 10px; cursor: crosshair;"></canvas>
@@ -204,12 +216,19 @@
         let currentMmPerPx = null;
         let currentPositions = {};
         let originalPositions = {};
-        let hideOtherChannels = true;
+        let hideOtherChannels = false;
 
         let currentRoiMargin = 300;
         let currentOriginalFileName = '';
 
-        let dragChannel = null;
+        let zoomLevel = 1.0;
+        let panOffsetX = 0;    // centro del viewport en coordenadas ROI (px)
+        let panOffsetY = 0;
+        let isPanning = false;
+        let panStartX = 0, panStartY = 0;
+        let panStartOffX = 0, panStartOffY = 0;
+
+        let dragChannel = null; // canal que se está arrastrando (reemplaza isDragging)
         let dragOffsetX = 0, dragOffsetY = 0;
         let roiOffsetX = 0, roiOffsetY = 0; // offset del ROI en imagen completa
 
@@ -220,6 +239,9 @@
         let configCalibrationMethod = 'camera_distance';  // 'camera_distance' | 'mark_size'
         let configCameraDistanceMm = 100;
         let configMarkSizeMm = 10;
+
+
+        
 
         // Inicializar cámara
         async function initCamera() {
@@ -708,6 +730,9 @@
         });
 
         function showAdjustView() {
+            updateZoomDisplay();
+            updateChannelUI();
+            
             // Ocultar mainView, mostrar adjustView
             mainView.style.display = 'none';
             adjustView.style.display = 'block';
@@ -738,91 +763,212 @@
                 adjustCanvas.width = rx2 - rx1;
                 adjustCanvas.height = ry2 - ry1;
 
+                panOffsetX = (adjustCanvas.width / 2) / zoomLevel;   // centro del ROI
+                panOffsetY = (adjustCanvas.height / 2) / zoomLevel;
+
                 ctx.clearRect(0, 0, adjustCanvas.width, adjustCanvas.height);
 
                 // Dibujar ROI recortado
                 ctx.drawImage(img, rx1, ry1, adjustCanvas.width, adjustCanvas.height, 0, 0, adjustCanvas.width, adjustCanvas.height);
 
                 // Dibujar marcadores para cada canal
-                drawMarkers(ctx, currentPositions, rx1, ry1);
+                drawAllMarkers(ctx, currentPositions, rx1, ry1);
             };
             img.src = capturedImageData;
         }
 
-
-
-        function drawMarkers(ctx, positions, roiOx, roiOy) {
-            //ctx.clearRect(0, 0, adjustCanvas.width, adjustCanvas.height);
-            const colors = {
-                'C': 'cyan',
-                'M': 'magenta',
-                'Y': 'yellow',
-                'K': 'gray'
-            };
-            const labels = ['C', 'M', 'Y', 'K'];
-            
-            // fondo transparente, dibujar círculos
-            labels.forEach(ch => {
-                if (!positions[ch]) return;
-                if (hideOtherChannels && ch !== selectedChannel) return;
-                const lx = positions[ch].x - roiOx;
-                const ly = positions[ch].y - roiOy;
-                
-                ctx.beginPath();
-                ctx.arc(lx, ly, currentMarkerRadius, 0, 2 * Math.PI);
-                ctx.fillStyle = colors[ch];
-                ctx.fill();
-                ctx.strokeStyle = 'white';
-                ctx.lineWidth = 2;
-                ctx.stroke();
-
-                // crosshair
-                ctx.beginPath();
-                ctx.moveTo(lx - 15, ly);
-                ctx.lineTo(lx + 15, ly);
-                ctx.moveTo(lx, ly - 15);
-                ctx.lineTo(lx, ly + 15);
-                ctx.strokeStyle = colors[ch];
-                ctx.lineWidth = 2;
-                ctx.stroke();
-
-                // label
-                ctx.fillStyle = 'white';
-                ctx.font = 'bold 12px sans-serif';
-                ctx.fillText(ch, lx + 12, ly - 12);
-            });
-        }
-
-                // ============ DRAG ============
-        function getCanvasPos(canvas, e) {
-            const rect = canvas.getBoundingClientRect();
-            const scaleX = canvas.width / rect.width;
-            const scaleY = canvas.height / rect.height;
-            const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-            const clientY = e.clientY || (e.touches && e.touches[0].clientY);
-            return {
-                x: (clientX - rect.left) * scaleX + roiOffsetX,
-                y: (clientY - rect.top) * scaleY + roiOffsetY,
-            };
-        }
+        // ============ DRAG ============
 
         function redrawAdjustCanvas() {
             const ctx = adjustCanvas.getContext('2d');
             const img = new Image();
             img.onload = function() {
-                const margin = currentRoiMargin;
-                const baseK = originalPositions['K'] || currentPositions['K'];
-                const rx1 = Math.max(baseK.x - currentRoiMargin, 0);
-                const ry1 = Math.max(baseK.y - currentRoiMargin, 0);
-                const rx2 = Math.min(baseK.x + currentRoiMargin, img.width);
-                const ry2 = Math.min(baseK.y + currentRoiMargin, img.height);
+                //const margin = currentRoiMargin;
+                //const baseK = originalPositions['K'] || currentPositions['K'];
+                const vw = adjustCanvas.width / zoomLevel;   // ancho del viewport en px de imagen
+                const vh = adjustCanvas.height / zoomLevel;   // alto del viewport
+                const srcX = roiOffsetX + panOffsetX - vw / 2;
+                const srcY = roiOffsetY + panOffsetY - vh / 2;
 
                 ctx.clearRect(0, 0, adjustCanvas.width, adjustCanvas.height);
-                ctx.drawImage(img, rx1, ry1, adjustCanvas.width, adjustCanvas.height, 0, 0, adjustCanvas.width, adjustCanvas.height);
-                drawMarkers(ctx, currentPositions, rx1, ry1);
+                ctx.drawImage(img, srcX, srcY, vw, vh, 0, 0, adjustCanvas.width, adjustCanvas.height);
+                drawAllMarkers(ctx);
             };
             img.src = capturedImageData;
         }
+
+        function drawAllMarkers(ctx) {
+            const colors = { 'C': 'cyan', 'M': 'magenta', 'Y': 'yellow', 'K': 'gray' };
+            ['C', 'M', 'Y', 'K'].forEach(ch => {
+                if (!currentPositions[ch]) return;
+                if (hideOtherChannels && ch !== selectedChannel) return;
+                const p = worldToScreen(currentPositions[ch].x, currentPositions[ch].y);
+                // círculo
+                ctx.beginPath(); ctx.arc(p.x, p.y, currentMarkerRadius, 0, 2 * Math.PI);
+                ctx.fillStyle = colors[ch]; ctx.fill();
+                ctx.strokeStyle = 'white'; ctx.lineWidth = 2; ctx.stroke();
+                // crosshair
+                ctx.beginPath(); ctx.moveTo(p.x - 15, p.y); ctx.lineTo(p.x + 15, p.y);
+                ctx.moveTo(p.x, p.y - 15); ctx.lineTo(p.x, p.y + 15);
+                ctx.strokeStyle = colors[ch]; ctx.lineWidth = 2; ctx.stroke();
+                // label
+                ctx.fillStyle = 'white'; ctx.font = 'bold 12px sans-serif';
+                ctx.fillText(ch, p.x + 12, p.y - 12);
+            });
+        }
+
+        function hitTestMarker(sx, sy) {
+            const threshold = currentMarkerRadius + 10; // px en pantalla
+            let best = null, bestDist = threshold;
+            ['C', 'M', 'Y', 'K'].forEach(ch => {
+                if (!currentPositions[ch]) return;
+                const p = worldToScreen(currentPositions[ch].x, currentPositions[ch].y);
+                const d = Math.hypot(sx - p.x, sy - p.y);
+                if (d < bestDist) { bestDist = d; best = ch; }
+            });
+            return best;
+        }
+
+        // Screen (canvas pixel) → World (imagen global)
+        function screenToWorld(sx, sy) {
+            return {
+                x: (sx - adjustCanvas.width / 2) / zoomLevel + panOffsetX + roiOffsetX,
+                y: (sy - adjustCanvas.height / 2) / zoomLevel + panOffsetY + roiOffsetY,
+            };
+        }
+
+        // World → Screen
+        function worldToScreen(wx, wy) {
+            return {
+                x: (wx - roiOffsetX - panOffsetX) * zoomLevel + adjustCanvas.width / 2,
+                y: (wy - roiOffsetY - panOffsetY) * zoomLevel + adjustCanvas.height / 2,
+            };
+        }
+
+        function mouseToCanvas(e) {
+            const rect = adjustCanvas.getBoundingClientRect();
+            return {
+                x: (e.clientX - rect.left) * (adjustCanvas.width / rect.width),
+                y: (e.clientY - rect.top) * (adjustCanvas.height / rect.height),
+            };
+        }
+
+        // Zoom centrado en cursor
+        function applyZoom(newZoom, cx, cy) {
+            const world = screenToWorld(cx, cy);
+            zoomLevel = Math.max(0.5, Math.min(20, newZoom));
+            panOffsetX = world.x - roiOffsetX - (cx - adjustCanvas.width / 2) / zoomLevel;
+            panOffsetY = world.y - roiOffsetY - (cy - adjustCanvas.height / 2) / zoomLevel;
+            updateZoomDisplay();
+            redrawAdjustCanvas();
+        }
+
+        function updateZoomDisplay() {
+            document.getElementById('zoomLevelDisplay').textContent = zoomLevel.toFixed(1) + 'x';
+        }
+
+        function zoomIn() {
+            const cx = adjustCanvas.width / 2;
+            const cy = adjustCanvas.height / 2;
+            applyZoom(zoomLevel * 1.3, cx, cy);
+        }
+
+        function zoomOut() {
+            const cx = adjustCanvas.width / 2;
+            const cy = adjustCanvas.height / 2;
+            applyZoom(zoomLevel / 1.3, cx, cy);
+        }
+
+        function fitView() {
+            zoomLevel = 1.0;
+            panOffsetX = adjustCanvas.width / 2;
+            panOffsetY = adjustCanvas.height / 2;
+            updateZoomDisplay();
+            redrawAdjustCanvas();
+        }
+
+        // Obtener canales disponibles para agregar
+        function getMissingChannels() {
+            return ['C', 'M', 'Y'].filter(ch => !currentPositions[ch]);
+        }
+
+        // Agregar canal en el centro del ROI visible
+        function addChannel(ch) {
+            if (currentPositions[ch]) return;
+            const centerX = Math.round(roiOffsetX + adjustCanvas.width / 2) +10;
+            const centerY = Math.round(roiOffsetY + adjustCanvas.height / 2) + 10;
+            currentPositions[ch] = { x: centerX, y: centerY };
+            selectedChannel = ch;
+            updateChannelUI();
+            redrawAdjustCanvas();
+        }
+
+        // Eliminar canal (excepto K)
+        function removeChannel(ch) {
+            if (ch === 'K') return;
+            delete currentPositions[ch];
+            if (selectedChannel === ch) {
+                selectedChannel = Object.keys(currentPositions).find(c => c !== 'K') || 'K';
+            }
+            updateChannelUI();
+            redrawAdjustCanvas();
+        }
+
+        // Actualizar estado visual de botones
+        function updateChannelUI() {
+            document.querySelectorAll('.channel-btn').forEach(btn => {
+                const ch = btn.dataset.channel;
+                const exists = !!currentPositions[ch];
+                btn.disabled = !exists && ch !== 'K'; // K siempre existe
+                btn.classList.toggle('active', ch === selectedChannel && exists);
+                btn.classList.toggle('disabled', !exists && ch !== 'K');
+            });
+            // Actualizar botón "−"
+            document.getElementById('removeChannelBtn').disabled = selectedChannel === 'K';
+            // Actualizar dropdown de agregar
+            updateAddDropdown();
+        }
+
+        // Llenar dropdown con canales faltantes
+        function updateAddDropdown() {
+            const dropdown = document.getElementById('addChannelDropdown');
+            const missing = getMissingChannels();
+            if (missing.length === 0) {
+                dropdown.innerHTML = '<div style="padding: 8px; color: #999; font-size: 13px;">Todos los canales presentes</div>';
+                return;
+            }
+            dropdown.innerHTML = missing.map(ch => {
+                const name = { C: 'Cian', M: 'Magenta', Y: 'Amarillo' }[ch];
+                const color = { C: 'cyan', M: 'magenta', Y: 'gold' }[ch];
+                return `<div data-channel="${ch}" style="padding: 8px 12px; cursor: pointer; font-size: 13px; border-bottom: 1px solid #eee; color: #333;">
+                    <span style="color: ${color}; font-weight: 700;">${ch}</span> ${name}
+                </div>`;
+            }).join('');
+            dropdown.querySelectorAll('[data-channel]').forEach(el => {
+                el.addEventListener('click', () => {
+                    addChannel(el.dataset.channel);
+                    dropdown.style.display = 'none';
+                });
+            });
+        }
+
+        document.getElementById('addChannelBtn').addEventListener('click', (e) => {
+            const dropdown = document.getElementById('addChannelDropdown');
+            updateAddDropdown();
+            dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+            e.stopPropagation();
+        });
+
+        // Cerrar dropdown al hacer clic fuera
+        document.addEventListener('click', () => {
+            document.getElementById('addChannelDropdown').style.display = 'none';
+        });
+
+        document.getElementById('removeChannelBtn').addEventListener('click', () => {
+            removeChannel(selectedChannel);
+        });
+
+
 
         // Para opciones de configuracion de imagenes.
         document.querySelectorAll('input[name="calMethod"]').forEach(el => {
@@ -855,35 +1001,92 @@
             redrawAdjustCanvas();
         });
 
+        // control de zoom
+        document.getElementById('fitViewBtn').addEventListener('click', () => {
+            zoomLevel = 1.0;
+            panOffsetX = adjustCanvas.width / 2;
+            panOffsetY = adjustCanvas.height / 2;
+            updateZoomDisplay();
+            redrawAdjustCanvas();
+        });
+
+        // controles de teclado 
+        document.addEventListener('keydown', (e) => {
+            if (adjustView.style.display !== 'block') return;
+            if (e.key === '+' || e.key === '=') { zoomIn(); e.preventDefault(); }
+            if (e.key === '-') { zoomOut(); e.preventDefault(); }
+            if (e.key === '0') { fitView(); }
+            if (e.key === 'ArrowUp')    { panOffsetY -= 10 / zoomLevel; redrawAdjustCanvas(); }
+            if (e.key === 'ArrowDown')  { panOffsetY += 10 / zoomLevel; redrawAdjustCanvas(); }
+            if (e.key === 'ArrowLeft')  { panOffsetX -= 10 / zoomLevel; redrawAdjustCanvas(); }
+            if (e.key === 'ArrowRight') { panOffsetX += 10 / zoomLevel; redrawAdjustCanvas(); }
+        });
+
+        document.getElementById('zoomInBtn').addEventListener('click', () => {
+            const cx = adjustCanvas.width / 2;
+            const cy = adjustCanvas.height / 2;
+            applyZoom(zoomLevel * 1.3, cx, cy);
+        });
+
+        document.getElementById('zoomOutBtn').addEventListener('click', () => {
+            const cx = adjustCanvas.width / 2;
+            const cy = adjustCanvas.height / 2;
+            applyZoom(zoomLevel / 1.3, cx, cy);
+        });
+
         // Mouse events
         adjustCanvas.addEventListener('mousedown', (e) => {
-            isDragging = true;
-            const rect = adjustCanvas.getBoundingClientRect();
-            const scaleX = adjustCanvas.width / rect.width;
-            const scaleY = adjustCanvas.height / rect.height;
-            const worldX = Math.round((e.clientX - rect.left) * scaleX + roiOffsetX);
-            const worldY = Math.round((e.clientY - rect.top) * scaleY + roiOffsetY);
-            currentPositions[selectedChannel] = { x: worldX, y: worldY };
-            redrawAdjustCanvas();
+            if (e.button === 2) { // click derecho → pan
+                isPanning = true;
+                panStartX = e.clientX;
+                panStartY = e.clientY;
+                panStartOffX = panOffsetX;
+                panStartOffY = panOffsetY;
+                adjustCanvas.style.cursor = 'grabbing';
+                return;
+            }
+            // click izquierdo → detectar marcador o iniciar drag
+            const pos = mouseToCanvas(e);
+            const ch = hitTestMarker(pos.x, pos.y);
+            if (ch) {
+                isDragging = true;
+                dragChannel = ch;
+                selectedChannel = ch;
+                // actualizar botón toggle
+                document.querySelectorAll('.channel-btn').forEach(b =>
+                    b.classList.toggle('active', b.dataset.channel === ch)
+                );
+            }
         });
-
-
 
         adjustCanvas.addEventListener('mousemove', (e) => {
-            if (!isDragging) return;
+            const pos = mouseToCanvas(e);
             const rect = adjustCanvas.getBoundingClientRect();
-            const scaleX = adjustCanvas.width / rect.width;
-            const scaleY = adjustCanvas.height / rect.height;
-            const worldX = Math.round((e.clientX - rect.left) * scaleX + roiOffsetX);
-            const worldY = Math.round((e.clientY - rect.top) * scaleY + roiOffsetY);
-            currentPositions[selectedChannel] = { x: worldX, y: worldY };
-            redrawAdjustCanvas();
+
+            if (isPanning) {
+                const scale = adjustCanvas.width / rect.width;
+                const dx = (e.clientX - panStartX) * scale / zoomLevel;
+                const dy = (e.clientY - panStartY) * scale / zoomLevel;
+                panOffsetX = panStartOffX - dx;
+                panOffsetY = panStartOffY - dy;
+                redrawAdjustCanvas();
+                return;
+            }
+
+            if (isDragging && dragChannel) {
+                const world = screenToWorld(pos.x, pos.y);
+                currentPositions[dragChannel] = { x: Math.round(world.x), y: Math.round(world.y) };
+                redrawAdjustCanvas();
+                return;
+            }
+
+            // hover cursor
+            adjustCanvas.style.cursor = hitTestMarker(pos.x, pos.y) ? 'grab' : 'default';
         });
 
-        adjustCanvas.addEventListener('mouseup', () => { isDragging = false; });
-
-        adjustCanvas.addEventListener('mouseleave', () => { isDragging = false; });
-
+        adjustCanvas.addEventListener('mouseup', () => { isPanning = false; isDragging = false; dragChannel = null; });
+        adjustCanvas.addEventListener('mouseleave', () => { isPanning = false; isDragging = false; dragChannel = null; });
+        adjustCanvas.addEventListener('contextmenu', (e) => e.preventDefault());
 
         // Touch events
         adjustCanvas.addEventListener('touchstart', (e) => {
@@ -948,6 +1151,21 @@
                 loading.style.display = 'none';
             }
         }
+
+
+        console.log('Canvas size:', adjustCanvas.width, 'x', adjustCanvas.height);
+        console.log('CSS rect:', adjustCanvas.getBoundingClientRect());
+
+        // 2. ¿Hay posiciones cargadas?
+        console.log('Positions:', JSON.stringify(currentPositions));
+
+        // 3. Prueba de hit test - mueve el mouse sobre un marcador y ejecuta:
+        adjustCanvas.addEventListener('mousemove', function test(e) {
+            const pos = mouseToCanvas(e);
+            const ch = hitTestMarker(pos.x, pos.y);
+            console.log('Cursor at canvas px:', pos.x, pos.y, '→ hit:', ch);
+            adjustCanvas.removeEventListener('mousemove', test);
+        }, { once: true });
 
         // Eventos mouse/touch para arrastrar
         // mousedown: detectar canal más cercano (dist < 20px), iniciar drag

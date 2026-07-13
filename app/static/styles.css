@@ -318,3 +318,11 @@ button {
 .channel-btn.active[data-channel="M"] { background: magenta; color: #fff; }
 .channel-btn.active[data-channel="Y"] { background: gold; color: #000; }
 .channel-btn.active[data-channel="K"] { background: #555; color: #fff; }
+
+.channel-btn.disabled {
+    opacity: 0.3;
+    border-color: #ccc !important;
+    cursor: not-allowed;
+    background: transparent !important;
+    color: #ccc !important;
+}
