@@ -22,7 +22,15 @@
                 <div class="controls">
                     <button class="btn-primary" id="captureBtn">Capturar Foto</button>
                     <button class="btn-secondary" id="toggleCameraBtn">Iniciar Cámara</button>
+                    <button class="btn-secondary" id="enlargeCameraBtn" style="flex: none; min-width: 80px;">Ampliar</button>
                 </div>
+            <div id="cameraFullscreenOverlay" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000; z-index: 999; flex-direction: column; justify-content: center; align-items: center;">
+                <video id="fullscreenVideo" autoplay playsinline style="width: 100%; height: 100%; object-fit: contain;"></video>
+                <div style="position: absolute; top: 20px; right: 20px; display: flex; gap: 10px;">
+                    <button class="btn-secondary" id="fullscreenCaptureBtn" style="padding: 8px 16px;">Capturar Foto</button>
+                    <button class="btn-secondary" id="reduceCameraBtn" style="padding: 8px 16px;">Reducir ✕</button>
+                </div>
+            </div>
             <div style="margin-top: 12px; border-top: 1px solid #eee; padding-top: 12px;">
                 <label for="fileInput" style="font-size: 13px; color: #666; display: block; margin-bottom: 8px;">
                     O sube una imagen desde tu computadora:
@@ -241,7 +249,12 @@
         let configMarkSizeMm = 10;
 
 
-        
+        // +++ Botón ampliar en mainView (declarar junto a otros elementos)
+        const enlargeCameraBtn = document.getElementById('enlargeCameraBtn');
+        const fullscreenVideo = document.getElementById('fullscreenVideo');
+        const cameraFullscreenOverlay = document.getElementById('cameraFullscreenOverlay');
+        const reduceCameraBtn = document.getElementById('reduceCameraBtn');
+        const fullscreenCaptureBtn = document.getElementById('fullscreenCaptureBtn');
 
         // Inicializar cámara
         async function initCamera() {
@@ -1166,6 +1179,51 @@
             console.log('Cursor at canvas px:', pos.x, pos.y, '→ hit:', ch);
             adjustCanvas.removeEventListener('mousemove', test);
         }, { once: true });
+
+
+
+
+        // *** Controles para FullScreen de Camara
+
+        
+        // Ampliar cámara
+        enlargeCameraBtn.addEventListener('click', () => {
+            if (!stream) { error.textContent = 'La cámara no está activa'; error.classList.add('show'); return; }
+            cameraFullscreenOverlay.style.display = 'flex';
+            document.body.classList.add('fullscreen-active');
+            fullscreenVideo.srcObject = stream;
+        });
+
+        // Reducir cámara
+        reduceCameraBtn.addEventListener('click', () => {
+            cameraFullscreenOverlay.style.display = 'none';
+            document.body.classList.remove('fullscreen-active');
+            fullscreenVideo.srcObject = null;
+        });
+
+        // Capturar desde fullscreen (reusa misma lógica que captureBtn)
+        fullscreenCaptureBtn.addEventListener('click', () => {
+            canvas.width = fullscreenVideo.videoWidth || video.videoWidth;
+            canvas.height = fullscreenVideo.videoHeight || video.videoHeight;
+            ctx.drawImage(fullscreenVideo, 0, 0);
+            
+            capturedImageData = canvas.toDataURL('image/jpeg', 0.95);
+            capturedImage.src = capturedImageData;
+            capturedImage.classList.add('show');
+            analyzeBtn.disabled = false;
+            clearBtn.disabled = false;
+            
+            // Cerrar fullscreen y analizar
+            reduceCameraBtn.click();
+            setTimeout(() => analyzeImage(), 500);
+        });
+
+        // Cerrar con tecla Escape
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && cameraFullscreenOverlay.style.display === 'flex') {
+                reduceCameraBtn.click();
+            }
+        });
 
         // Eventos mouse/touch para arrastrar
         // mousedown: detectar canal más cercano (dist < 20px), iniciar drag

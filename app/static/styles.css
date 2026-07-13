@@ -326,3 +326,7 @@ button {
     background: transparent !important;
     color: #ccc !important;
 }
+
+body.fullscreen-active {
+    overflow: hidden;
+}
