@@ -1,6 +1,6 @@
 import cv2
 import numpy as np
-from config import GRAY_EXCLUSION_ENABLED, GRAY_CROMA_MAX, GRAY_L_MAX
+from ..config import GRAY_EXCLUSION_ENABLED, GRAY_CROMA_MAX, GRAY_L_MAX
 
 
 def crear_imagen_canal_color(crop_bgr, ch_name, ch_info, k_local_cx, k_local_cy,
