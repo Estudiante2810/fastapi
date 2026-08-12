@@ -146,11 +146,11 @@ def procesar_imagen_completa(
         f = np.sqrt(avg_k_score)
         dyn_roi_margin    = max(MIN_ROI_MARGIN,    int(230 * f))
         dyn_search_radius    = max(MIN_SEARCH_RADIUS, int(110 * f))
-        dyn_pixel_accept_amount    = max(PX_MIN_ACCEPT_LOW, int(800 * avg_k_score))
+        dyn_pixel_accept_amount    = max(PX_MIN_ACCEPT_LOW, int(400 * avg_k_score))
         dyn_normalizer_score  = max(SCORE_NORMALIZER_LOW, int(300 * avg_k_score))
     else:
         # valores defectos en el caso que la deteccion inicial no da una calificacion de K utilizable
-        dyn_roi_margin, dyn_search_radius, dyn_pixel_accept_amount, dyn_normalizer_score = roi_margin, search_radius, 800, 300
+        dyn_roi_margin, dyn_search_radius, dyn_pixel_accept_amount, dyn_normalizer_score = roi_margin, search_radius, 400, 300
 
     # PASO 2: Detectar solo los canales seleccionados
     cmyk_marks     = {'K': k_marks}
