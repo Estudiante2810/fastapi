@@ -60,8 +60,8 @@ async function initCamera() {
 
         stream = await navigator.mediaDevices.getUserMedia({
             video: {
-                width: { ideal: 1280 },
-                height: { ideal: 720 },
+                width: { min: 1920, ideal: 3840 },
+                height: { min: 1080, ideal: 2160 },
                 facingMode: 'user'
             }
         });

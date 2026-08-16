@@ -72,7 +72,7 @@ MARK_DIAMETER_PX = 2 * RING_RADIUS_PX
 # ═══════════════════════════════════════════════════════════════════════════
 # NORMALIZACIÓN DE FONDO BLANCO (v3.2+)
 # ═══════════════════════════════════════════════════════════════════════════
-WHITE_BG_NORMALIZE = True              # Activar/desactivar normalización
+WHITE_BG_NORMALIZE = False              # Activar/desactivar normalización
 WHITE_L_THRESHOLD = 150                # Threshold de luminancia (L en LAB)
 WHITE_TOLERANCE_MIN = 15               # Tolerancia mínima (RGB equivalente)
 WHITE_TOLERANCE_MAX = 50               # Tolerancia máxima (RGB equivalente)
