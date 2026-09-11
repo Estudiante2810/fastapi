@@ -4,6 +4,13 @@ Aplicación web basada en visión computacional para detectar marcas de registro
 
 El sistema está diseñado como una herramienta de asistencia para el operador de prensa. Recibe una imagen capturada por cámara, localiza las marcas de registro, calcula sus posiciones relativas y presenta los resultados en píxeles y milímetros.
 
+<img width="1301" height="645" alt="image" src="https://github.com/user-attachments/assets/d4694790-d294-422f-868f-dd1038665102" />
+
+<img width="1302" height="639" alt="image" src="https://github.com/user-attachments/assets/403f68f3-251c-4026-85ba-6aef198f74f4" />
+
+<img width="1294" height="641" alt="image" src="https://github.com/user-attachments/assets/c3a0e327-e8fa-489f-9ea1-91712b6a93a4" />
+
+
 ## 1. Objetivo del sistema
 
 ### 1.1 Objetivo general
@@ -320,6 +327,137 @@ Antes de utilizar el sistema en un entorno público se recomienda añadir autent
 - Migrar el historial a una base de datos o almacenamiento persistente.
 - Añadir autenticación y control de acceso.
 
-## 10. Documentación adicional
+## 10. Resultados Adicionales
+
+Las pruebas siguientes fueron realizadas con datos sinteticos generados para analizar el sistema para fallos inesperados.
+
+Ejemplo de una imagen calibrada:
+
+<img width="1141" height="639" alt="image" src="https://github.com/user-attachments/assets/74cd4315-1e47-4f03-91f6-fd85c3529e6b" />
+
+Ejemplo de una imagen no calibrada:
+
+<img width="1160" height="647" alt="image" src="https://github.com/user-attachments/assets/e22fa3a8-49db-4df3-82c5-592be411a71b" />
+
+
+500 imagenes:
+
+<img width="960" height="540" alt="boxplot_desvios" src="https://github.com/user-attachments/assets/e57d8045-853d-41f5-9036-9f6d7a951744" />
+<img width="1800" height="480" alt="desvios_por_color" src="https://github.com/user-attachments/assets/7eb5c4f6-6237-4849-9a45-7bd93ba37546" />
+<img width="660" height="540" alt="matriz_confusion_calibracion" src="https://github.com/user-attachments/assets/f87c62ad-a4fa-4372-8890-ab55523c81ec" />
+<img width="960" height="540" alt="precision_por_color" src="https://github.com/user-attachments/assets/079b3405-6095-44bb-94d8-996bc8d7f66a" />
+
+Imágenes:           500
+Tolerancia:         0.1 mm
+mm_por_px:          0.025808 mm/px (factor 0.812, dist 100.0 mm)
+
+--- Precisión individual por color ---
+  C: 82.8% (188/227) | media 0.066 mm | máx 0.470 mm
+  M: 81.5% (181/222) | media 0.064 mm | máx 0.310 mm
+  Y: 89.0% (194/218) | media 0.060 mm | máx 0.446 mm
+
+--- Ranking de colores mejor detectados ---
+  1. Y: 89.0%
+  2. C: 82.8%
+  3. M: 81.5%
+
+--- Precisión total de la carpeta ---
+  72.4% (362/500 imágenes analizadas bien)
+
+  81.0% (405/500 imágenes con 1 excluido permitido)
+
+
+  87.2% (436/500 imágenes con 1 fallo permitido)
+
+--- Matriz de confusión calibración ---
+  inferida=indeterminada  GT=0 : 0
+  inferida=indeterminada  GT=1 : 0
+  inferida=no calibrada   GT=0 : 350
+  inferida=no calibrada   GT=1 : 0
+  inferida=calibrada      GT=0 : 0
+  inferida=calibrada      GT=1 : 150
+  Precisión de clasificación: 100.0%
+
+  
+
+1000 imagenes:
+
+<img width="960" height="540" alt="boxplot_desvios" src="https://github.com/user-attachments/assets/825e78df-a870-4eb3-abcf-497f7695cfa8" />
+<img width="1800" height="480" alt="desvios_por_color" src="https://github.com/user-attachments/assets/17fed228-bdf3-4760-ab76-d7097dd20866" />
+<img width="660" height="540" alt="matriz_confusion_calibracion" src="https://github.com/user-attachments/assets/c5e9af4d-cada-467a-b766-4d5bbfb646ab" />
+<img width="960" height="540" alt="precision_por_color" src="https://github.com/user-attachments/assets/e15b1df1-379b-45d1-8557-8013c358a000" />
+
+Imágenes:           1000
+Tolerancia:         0.1 mm
+mm_por_px:          0.025808 mm/px (factor 0.812, dist 100.0 mm)
+
+--- Precisión individual por color ---
+  C: 83.6% (382/457) | media 0.066 mm | máx 0.538 mm
+  M: 81.5% (362/444) | media 0.067 mm | máx 0.498 mm
+  Y: 86.3% (384/445) | media 0.062 mm | máx 0.422 mm
+
+--- Ranking de colores mejor detectados ---
+  1. Y: 86.3%
+  2. C: 83.6%
+  3. M: 81.5%
+
+--- Precisión total de la carpeta ---
+  72.3% (723/1000 imágenes analizadas bien)
+
+  80.3% (803/1000 imágenes con 1 excluido permitido)
+
+
+  87.3% (873/1000 imágenes con 1 fallo permitido)
+
+--- Matriz de confusión calibración ---
+  inferida=indeterminada  GT=0 : 0
+  inferida=indeterminada  GT=1 : 0
+  inferida=no calibrada   GT=0 : 700
+  inferida=no calibrada   GT=1 : 0
+  inferida=calibrada      GT=0 : 0
+  inferida=calibrada      GT=1 : 300
+  Precisión de clasificación: 100.0%
+
+
+2000 imagenes:
+
+<img width="960" height="540" alt="boxplot_desvios" src="https://github.com/user-attachments/assets/daa28fda-b414-4fc9-b940-d3b447207177" />
+<img width="1800" height="480" alt="desvios_por_color" src="https://github.com/user-attachments/assets/1f568ce1-62f5-46be-8faf-f9224d13f80a" />
+<img width="660" height="540" alt="matriz_confusion_calibracion" src="https://github.com/user-attachments/assets/25e5ddcf-ee36-4863-b5a3-0cbafe223986" />
+<img width="960" height="540" alt="precision_por_color" src="https://github.com/user-attachments/assets/a2e532d8-5848-4336-a59c-b7f26a6367d4" />
+
+Imágenes:           2000
+Tolerancia:         0.1 mm
+mm_por_px:          0.025808 mm/px (factor 0.812, dist 100.0 mm)
+
+--- Precisión individual por color ---
+  C: 85.4% (726/850) | media 0.063 mm | máx 0.538 mm
+  M: 86.0% (711/827) | media 0.062 mm | máx 0.498 mm
+  Y: 87.4% (736/842) | media 0.061 mm | máx 0.484 mm
+
+--- Ranking de colores mejor detectados ---
+  1. Y: 87.4%
+  2. M: 86.0%
+  3. C: 85.4%
+
+--- Precisión total de la carpeta ---
+  73.0% (1461/2000 imágenes analizadas bien)
+
+  83.5% (1618/2000 imágenes con 1 excluido permitido)
+
+
+  88.1% (1707/2000 imágenes con 1 fallo permitido)
+
+--- Matriz de confusión calibración ---
+  inferida=indeterminada  GT=0 : 62
+  inferida=indeterminada  GT=1 : 0
+  inferida=no calibrada   GT=0 : 1336
+  inferida=no calibrada   GT=1 : 0
+  inferida=calibrada      GT=0 : 2
+  inferida=calibrada      GT=1 : 600
+  Precisión de clasificación: 99.9%
+
+
+## 11. Documentación adicional
 
 Los diagramas de arquitectura, casos de uso y secuencia se encuentran en [`docs/diagramas.md`](docs/diagramas.md).
